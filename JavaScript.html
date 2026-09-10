@@ -9,7 +9,9 @@ var S = {
   spil: { hest: { aktiv: false, chance: 20, gaelderFor: 'Øl', antalHeste: 4 } },
   indst: { valuta: 'kr', titel: 'Køleskabet', fortrydSekunder: 8, inaktivSekunder: 60,
            tilladSalgUdenLager: true, standardMinLager: 3, pantBeloeb: 1,
-           standardGruppe: 'Beboere', grupper: ['Beboere', "Ex'ere"] },
+           knapStoerrelse: 100,
+           standardGruppe: 'Beboere', gaesteGruppe: 'Gæster', tilladGaester: true,
+           grupper: ['Beboere', "Ex'ere", 'Gæster'] },
   skaerm: 'personer',
   person: null,
   kurv: {},
@@ -29,6 +31,7 @@ var S = {
 
 var KOE_NOEGLE = 'koeleskab_koe_v1';
 var BILLED_NOEGLE = 'koeleskab_billeder_v1';
+var BILLED_STEMPEL = 'koeleskab_billedstempel_v1';
 var BILLED_MAKS = 44000;
 var inaktivTimer = null;
 var kvitteringTimer = null;
@@ -204,6 +207,8 @@ function tilstandStribe() {
 function brugteGrupper() {
   var fundet = {};
   aktivePersoner().forEach(function (p) { fundet[p.gruppe || 'Beboere'] = true; });
+  // Gæstegruppen vises altid, ellers er der ingen vej ind for den første gæst
+  if (S.indst.tilladGaester && S.indst.gaesteGruppe) fundet[S.indst.gaesteGruppe] = true;
   var raekkefoelge = (S.indst.grupper || []).slice();
   var ud = raekkefoelge.filter(function (g) { return fundet[g]; });
   Object.keys(fundet).sort(function (a, b) { return a.localeCompare(b, 'da'); })
@@ -235,6 +240,43 @@ function nulstilInaktiv() {
     S.skaerm = 'personer';
     render();
   }, (S.indst.inaktivSekunder || 60) * 1000);
+}
+
+/* ---------- Knapstørrelse ---------- */
+
+var KNAPTRIN = [
+  { v: 85,  navn: 'Lille' },
+  { v: 100, navn: 'Normal' },
+  { v: 120, navn: 'Stor' },
+  { v: 145, navn: 'Ekstra stor' }
+];
+
+/**
+ * Skalaen sidder som en CSS-variabel, så felternes indhold følger med.
+ * Kolonnebredderne skrives derimod ud som færdige tal: repeat(auto-fill, …)
+ * genberegner ikke når en variabel inde i minmax() ændrer sig, så griddet
+ * ville blive stående med sin oprindelige bredde.
+ */
+function anvendKnapStoerrelse(procent) {
+  var p = Math.max(70, Math.min(200, Number(procent) || 100));
+  var k = p / 100;
+  document.documentElement.style.setProperty('--skala', k.toFixed(3));
+
+  var el = document.getElementById('skalastil');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'skalastil';
+    document.head.appendChild(el);
+  }
+  function spor(basis) {
+    return 'repeat(auto-fill,minmax(' + Math.round(basis * k) + 'px,1fr))';
+  }
+  el.textContent =
+    '.grid-personer{grid-template-columns:' + spor(152) + '}' +
+    '.grid-produkter{grid-template-columns:' + spor(148) + '}' +
+    '@media (max-width:900px){' +
+    '.grid-personer{grid-template-columns:' + spor(136) + '}' +
+    '.grid-produkter{grid-template-columns:' + spor(132) + '}}';
 }
 
 /* ---------- Fuld skærm ---------- */
@@ -288,9 +330,16 @@ document.addEventListener('visibilitychange', function () {
 function laesBilledCache() {
   try { S.billeder = JSON.parse(localStorage.getItem(BILLED_NOEGLE) || '{}'); }
   catch (e) { S.billeder = {}; }
+  opdaterBilledStil();
 }
 function gemBilledCache() {
   try { localStorage.setItem(BILLED_NOEGLE, JSON.stringify(S.billeder)); } catch (e) {}
+  opdaterBilledStil();
+}
+
+/** Efter en lokal ændring passer stemplet ikke længere – tving et nyt hent. */
+function nulstilBilledStempel() {
+  try { localStorage.removeItem(BILLED_STEMPEL); } catch (e) {}
 }
 
 /**
@@ -512,6 +561,27 @@ function tagBilledeMedKamera(rundBeskaering) {
 
 function billedeFor(id) { return S.billeder[id] || ''; }
 
+/* Billeddata er tunge. Skrives de ind i markuppen, skal hele molevitten
+ * bygges og parses forfra hver gang skærmen tegnes – og skærmen tegnes ved
+ * hvert eneste tryk. I stedet lægges de som CSS-regler én gang, så markuppen
+ * kun indeholder et klassenavn.                                            */
+function billedKlasse(id) { return 'bg-' + String(id).replace(/[^A-Za-z0-9_-]/g, ''); }
+
+function opdaterBilledStil() {
+  var el = document.getElementById('billedstil');
+  if (!el) {
+    el = document.createElement('style');
+    el.id = 'billedstil';
+    document.head.appendChild(el);
+  }
+  var regler = [];
+  Object.keys(S.billeder).forEach(function (id) {
+    var b = S.billeder[id];
+    if (b) regler.push('.' + billedKlasse(id) + '{background-image:url(' + b + ')}');
+  });
+  el.textContent = regler.join('\n');
+}
+
 /** Fælles billedvælger til produkt- og persondialoger. */
 function billedFelt(id, valgtBillede, form) {
   var b = valgtBillede;
@@ -578,11 +648,13 @@ function gemBilledeFor(id, tilstand) {
     return kald('gemBillede', S.pin, id, tilstand.billede).then(function () {
       S.billeder[id] = tilstand.billede;
       gemBilledCache();
+      nulstilBilledStempel();
     });
   }
   return kald('sletBillede', S.pin, id).then(function () {
     delete S.billeder[id];
     gemBilledCache();
+    nulstilBilledStempel();
   });
 }
 
@@ -634,10 +706,9 @@ function koeStribe() {
 }
 
 function avatarHtml(p, ekstraKlasse) {
-  var b = billedeFor(p.id);
-  if (b) {
-    return '<div class="avatar foto ' + (ekstraKlasse || '') + '" style="background-image:url(' +
-           b + ')"></div>';
+  if (billedeFor(p.id)) {
+    return '<div class="avatar foto ' + (ekstraKlasse || '') + ' ' +
+           billedKlasse(p.id) + '"></div>';
   }
   return '<div class="avatar ' + (ekstraKlasse || '') + '" style="background:' + esc(p.farve) +
          '">' + esc(initialer(p.navn)) + '</div>';
@@ -657,6 +728,8 @@ function renderPersoner() {
   var filtreret = personer.filter(function (p) {
     return S.gruppe === 'ALLE' || (p.gruppe || 'Beboere') === S.gruppe;
   });
+  var visGaestefelt = S.indst.tilladGaester &&
+    (S.gruppe === 'ALLE' || S.gruppe === S.indst.gaesteGruppe);
 
   var h = '';
   h += '<div class="top">';
@@ -694,7 +767,11 @@ function renderPersoner() {
   }
 
   h += '<div class="indhold">';
-  if (!filtreret.length) {
+  if (!filtreret.length && visGaestefelt) {
+    h += '<div class="tom-besked" style="padding:26px 20px 6px">' +
+         'Ingen gæster endnu — tryk herunder for at oprette dig.</div>';
+    h += '<div class="grid grid-personer">' + gaestefeltHtml() + '</div>';
+  } else if (!filtreret.length) {
     h += '<div class="tom-besked"><div class="stor">👤</div>Ingen personer i ' +
          esc(S.gruppe === 'ALLE' ? 'listen' : S.gruppe) + '.<br>' +
          'Tilføj dem under ⚙️ Administration.</div>';
@@ -705,19 +782,71 @@ function renderPersoner() {
            avatarHtml(p) +
            '<div class="navn">' + esc(p.navn) + '</div></button>';
     });
+    if (visGaestefelt) h += gaestefeltHtml();
     h += '</div>';
   }
   h += '</div>';
   return h;
 }
 
+function gaestefeltHtml() {
+  return '<button class="persontile nygaest" data-nygaest="1">' +
+         '<div class="avatar plus">＋</div>' +
+         '<div class="navn">Ny gæst</div></button>';
+}
+
+/** Opret dig selv som gæst – ingen kode, kun et navn. */
+function visNyGaest() {
+  var h = '<div class="overlay"><div class="dialog" style="max-width:460px">';
+  h += '<h2>Velkommen</h2>';
+  h += '<p class="hjaelp">Skriv dit navn, så kan du købe med. Det du køber, ' +
+       'ryger på din egen regning — ligesom for alle andre.</p>';
+  h += '<div class="felt"><label>Dit navn</label>' +
+       '<input id="g-navn" maxlength="40" autocomplete="off" placeholder="fx Sofie fra 3. sal"></div>';
+  h += '<div class="knapper">' +
+       '<button class="stor-knap graa" id="g-annuller">Fortryd</button>' +
+       '<button class="stor-knap" id="g-opret">Opret mig</button></div>';
+  h += '</div></div>';
+  $('overlaylag').innerHTML = h;
+
+  var felt = $('g-navn');
+  try { felt.focus(); } catch (e) {}
+
+  function opret() {
+    var navn = felt.value;
+    if (String(navn).trim().length < 2) { toast('Skriv dit navn', true); return; }
+    $('g-opret').disabled = true;
+    kald('opretGaest', navn)
+      .then(function (svar) {
+        S.personer = svar.personer;
+        var ny = personMed(svar.id);
+        lukDialog();
+        if (ny) {
+          // Direkte videre til varerne – man står jo ved køleskabet
+          S.person = ny; S.kurv = {}; S.kurvAaben = false;
+          S.kategori = 'ALLE'; S.skaerm = 'produkter';
+        }
+        render();
+        toast('Velkommen, ' + (ny ? ny.navn.split(' ')[0] : 'gæst') + '!');
+      })
+      .catch(function (e) {
+        if ($('g-opret')) $('g-opret').disabled = false;
+        toast(e.message, true);
+      });
+  }
+
+  $('g-opret').onclick = opret;
+  $('g-annuller').onclick = lukDialog;
+  felt.onkeydown = function (ev) { if (ev.key === 'Enter') opret(); };
+}
+
 /* ---------- Skærm 2: produkter ---------- */
 
 function produktMedieHtml(p, iKurv, maerke) {
-  var b = billedeFor(p.id);
   var h = '<div class="medie">';
-  h += b ? '<div class="produktbillede" style="background-image:url(' + b + ')"></div>'
-         : '<div class="emoji">' + esc(p.emoji) + '</div>';
+  h += billedeFor(p.id)
+     ? '<div class="produktbillede ' + billedKlasse(p.id) + '"></div>'
+     : '<div class="emoji">' + esc(p.emoji) + '</div>';
   h += '<span class="lagermaerke ' + lagerKlasse(p) + '">' + esc(maerke) + '</span>';
   if (iKurv) {
     h += '<div class="tael">' +
@@ -787,9 +916,9 @@ function renderProdukter() {
     if (S.kurvAaben) {
       h += '<div class="kurvliste">';
       kurvLinjer().forEach(function (l) {
-        var b = billedeFor(l.id);
         h += '<div class="kurvlinje">' +
-             (b ? '<div class="minibillede" style="background-image:url(' + b + ')"></div>'
+             (billedeFor(l.id)
+                ? '<div class="minibillede ' + billedKlasse(l.id) + '"></div>'
                 : '<div class="minibillede tom">' + esc(l.produkt.emoji) + '</div>') +
              '<div class="navn">' + esc(l.produkt.navn) + '</div>' +
              (l.produkt.pant && S.indst.pantBeloeb > 0
@@ -1876,8 +2005,7 @@ function renderAdmin() {
 /* ---------- Lager ---------- */
 
 function miniBilledeHtml(p) {
-  var b = billedeFor(p.id);
-  if (b) return '<div class="minibillede" style="background-image:url(' + b + ')"></div>';
+  if (billedeFor(p.id)) return '<div class="minibillede ' + billedKlasse(p.id) + '"></div>';
   return '<div class="emoji">' + esc(p.emoji) + '</div>';
 }
 
@@ -2314,7 +2442,7 @@ function gemKlipListe(liste) {
       });
     })(i);
   }
-  return kaede.then(function () { gemBilledCache(); });
+  return kaede.then(function () { gemBilledCache(); nulstilBilledStempel(); });
 }
 
 function visSpilIndstillinger() {
@@ -3018,6 +3146,7 @@ function visMinSide() {
       kald_.then(function () {
         if (nyt) S.billeder[p.id] = nyt; else delete S.billeder[p.id];
         gemBilledCache();
+        nulstilBilledStempel();
         toast(nyt ? 'Dit billede er gemt' : 'Billedet er fjernet');
         var av = document.querySelector('.minside-top .avatar');
         if (av) av.outerHTML = avatarHtml(p);
@@ -3304,6 +3433,23 @@ function renderIndstillinger() {
   var h = '<div class="sektion" style="max-width:560px">';
   h += '<div class="felt"><label>Titel i toppen</label><input id="i-titel" value="' +
        esc(i.titel) + '"></div>';
+  h += '<div class="felt"><label>Størrelse på knapperne i kiosken</label>' +
+       '<div class="skalavaelger" id="i-skala">' +
+       KNAPTRIN.map(function (t) {
+         return '<button type="button" class="chip' +
+                (i.knapStoerrelse === t.v ? ' aktiv' : '') + '" data-skala="' + t.v + '">' +
+                esc(t.navn) + '</button>';
+       }).join('') +
+       '</div>' +
+       '<div class="skalaeksempel"><div class="grid grid-personer" id="i-skalaeksempel">' +
+       aktivePersoner().slice(0, 4).map(function (p) {
+         return '<div class="persontile">' + avatarHtml(p) +
+                '<div class="navn">' + esc(p.navn) + '</div></div>';
+       }).join('') +
+       '</div></div>' +
+       '<p class="hjaelp" style="margin:9px 0 0">Vælg og se med det samme. ' +
+       'Større knapper er nemmere at ramme, men der er færre på skærmen ad gangen.</p></div>';
+
   h += '<div class="felt"><label>Grupper (adskilt med komma)</label>' +
        '<input id="i-grupper" value="' + esc((i.grupper || []).join(', ')) + '"></div>';
   h += '<div class="felt"><label>Standardgruppe for nye personer</label>' +
@@ -3326,6 +3472,12 @@ function renderIndstillinger() {
        '<input id="i-pant" type="number" step="0.5" inputmode="decimal" value="' +
        i.pantBeloeb + '"></div></div>';
   h += '<p class="hjaelp">Sæt pant til 0 for at fjerne pant-knappen helt i kiosken.</p>';
+  h += '<div class="kontakt"><input type="checkbox" id="i-gaester"' +
+       (i.tilladGaester ? ' checked' : '') +
+       '><label for="i-gaester">Lad gæster oprette sig selv i kiosken</label></div>';
+  h += '<p class="hjaelp">Gæster kommer i gruppen <strong>' + esc(i.gaesteGruppe) +
+       '</strong> og kan kun oprette sig med et navn — de kan ikke lave beboere. ' +
+       'Slå det fra uden for fester.</p>';
   h += '<div class="kontakt"><input type="checkbox" id="i-uden"' +
        (i.tilladSalgUdenLager ? ' checked' : '') +
        '><label for="i-uden">Tillad køb selv om lageret står til 0</label></div>';
@@ -3336,9 +3488,38 @@ function renderIndstillinger() {
   h += '</div>';
 
   h += '<div class="sektion"><h3>Data</h3>' +
-       '<p class="hjaelp">Alt ligger i regnearket bag denne app – fanerne Personer, Produkter, Køb, ' +
-       'Lagerbevægelser, Billeder og Afregninger. Du kan altid rette direkte i regnearket.</p></div>';
+       '<p class="hjaelp">Alt ligger i regnearket bag denne app – fanerne Personer, Produkter, ' +
+       'Køb, Lagerbevægelser, Spil, Billeder og Afregninger. Du kan altid rette direkte i ' +
+       'regnearket, også hjemmefra.</p>' +
+       '<div id="adresser" class="adresser">' +
+       '<button class="stor-knap graa" data-hentadresser="1">🔗 Vis links til regneark og kiosk</button>' +
+       '</div></div>';
   return h;
+}
+
+/** Henter og viser adresserne, så de kan kopieres eller åbnes. */
+function visAdresser() {
+  var boks = $('adresser');
+  if (!boks) return;
+  boks.innerHTML = '<div class="tom-besked" style="padding:18px">' +
+                   '<div class="spinner" style="margin:0 auto"></div></div>';
+  kald('hentAdresser', S.pin).then(function (a) {
+    var h = '';
+    h += '<div class="adresse"><div class="l">Regnearket – her ligger alle data</div>' +
+         '<a href="' + esc(a.regneark) + '" target="_blank" rel="noopener">' +
+         esc(a.regneark) + '</a></div>';
+    if (a.kiosk) {
+      h += '<div class="adresse"><div class="l">Kiosken – denne side</div>' +
+           '<a href="' + esc(a.kiosk) + '" target="_blank" rel="noopener">' +
+           esc(a.kiosk) + '</a></div>';
+    }
+    h += '<p class="hjaelp" style="margin:10px 0 0">Gem dem som bogmærker. ' +
+         'Kioskens adresse virker fra enhver enhed – så kan du også styre ' +
+         'priser og lager hjemmefra med PIN-koden.</p>';
+    boks.innerHTML = h;
+  }).catch(function (e) {
+    boks.innerHTML = '<p class="hjaelp">' + esc(e.message) + '</p>';
+  });
 }
 
 function gemIndstillinger() {
@@ -3352,7 +3533,9 @@ function gemIndstillinger() {
     ['InaktivSekunder', $('i-inaktiv').value || 60],
     ['StandardMinLager', $('i-min').value || 3],
     ['PantBeløb', $('i-pant').value || 0],
-    ['TilladSalgUdenLager', $('i-uden').checked ? 'ja' : 'nej']
+    ['TilladSalgUdenLager', $('i-uden').checked ? 'ja' : 'nej'],
+    ['TilladGæster', $('i-gaester').checked ? 'ja' : 'nej'],
+    ['KnapStørrelse', S.indst.knapStoerrelse]
   ];
   if (nyPin) {
     if (!/^\d{4}$/.test(nyPin)) { toast('PIN skal være 4 cifre', true); return; }
@@ -3365,6 +3548,7 @@ function gemIndstillinger() {
   kaede.then(function () { return kald('hentStartdata'); })
     .then(function (d) {
       S.indst = d.indstillinger;
+      anvendKnapStoerrelse(S.indst.knapStoerrelse);
       S.gruppe = null;
       if (nyPin) S.pin = nyPin;
       document.title = S.indst.titel;
@@ -3381,8 +3565,8 @@ function gemIndstillinger() {
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest('[data-person],[data-produkt],[data-gaa],[data-gruppe],[data-kategori],' +
     '[data-plus],[data-minus],[data-koeb],[data-toemkurv],[data-kurvaaben],[data-fane],[data-genindlaes],' +
-    '[data-pantlinje],[data-pantalle],[data-minside],[data-fuldskaerm],' +
-    '[data-startshow],[data-aarsperson],[data-aarsfane],' +
+    '[data-pantlinje],[data-pantalle],[data-minside],[data-fuldskaerm],[data-nygaest],' +
+    '[data-startshow],[data-aarsperson],[data-aarsfane],[data-hentadresser],[data-skala],' +
     '[data-nytprodukt],[data-redigerprodukt],[data-pris],[data-nyperson],[data-redigerperson],' +
     '[data-juster],[data-paafyld],[data-optael],[data-indkoeb],[data-lagerlog],' +
     '[data-nytilstand],[data-redigertilstand],[data-taendtilstand],[data-sluktilstand],' +
@@ -3406,6 +3590,7 @@ document.addEventListener('click', function (ev) {
   if (a('data-kurvaaben')) { S.kurvAaben = !S.kurvAaben; render(); return; }
   if (a('data-minside')) { clearTimeout(inaktivTimer); visMinSide(); return; }
   if (a('data-fuldskaerm')) { skiftFuldSkaerm(); return; }
+  if (a('data-nygaest')) { visNyGaest(); return; }
   if (a('data-koeb')) { gennemfoerKoeb(); return; }
   if (a('data-gruppe')) { S.gruppe = a('data-gruppe'); render(); return; }
   if (a('data-kategori')) { S.kategori = a('data-kategori'); render(); return; }
@@ -3457,6 +3642,7 @@ document.addEventListener('click', function (ev) {
         S.tilstand = svar[0].tilstand || null;
         if (svar[0].spil) S.spil = svar[0].spil;
         S.indst = svar[0].indstillinger;
+        anvendKnapStoerrelse(S.indst.knapStoerrelse);
         S.billeder = svar[1] || {};
         gemBilledCache();
         render(); toast('Opdateret');
@@ -3571,6 +3757,16 @@ document.addEventListener('click', function (ev) {
       .catch(function (e) { toast(e.message, true); });
     return;
   }
+  if (a('data-skala')) {
+    var v = parseInt(a('data-skala'), 10);
+    S.indst.knapStoerrelse = v;
+    anvendKnapStoerrelse(v);
+    $('i-skala').querySelectorAll('[data-skala]').forEach(function (b) {
+      b.className = 'chip' + (parseInt(b.getAttribute('data-skala'), 10) === v ? ' aktiv' : '');
+    });
+    return;
+  }
+  if (a('data-hentadresser')) { visAdresser(); return; }
   if (a('data-gemindst')) { gemIndstillinger(); return; }
 });
 
@@ -3606,11 +3802,28 @@ function visCsv(csv) {
  * ================================================================== */
 
 function hentBillederFraServer() {
-  return kald('hentBilleder').then(function (b) {
-    S.billeder = b || {};
-    gemBilledCache();
-    render();
-  }).catch(function () { /* cachen bruges videre */ });
+  var lokalt = null;
+  try { lokalt = localStorage.getItem(BILLED_STEMPEL); } catch (e) {}
+
+  function hentAlt(stempel) {
+    return kald('hentBilleder').then(function (b) {
+      S.billeder = b || {};
+      gemBilledCache();
+      if (stempel) { try { localStorage.setItem(BILLED_STEMPEL, stempel); } catch (e) {} }
+      render();
+    });
+  }
+
+  // Først et lille stempel. Er billederne uændrede, springes de tunge data over.
+  return kald('hentBilledStempel').then(
+    function (stempel) {
+      if (lokalt && stempel === lokalt && Object.keys(S.billeder).length) return;
+      return hentAlt(stempel);
+    },
+    // Kan stemplet ikke hentes – fx en ældre udrulning – så hent som før,
+    // hellere end at stå uden billeder
+    function () { return hentAlt(null); }
+  ).catch(function () { /* cachen bruges videre */ });
 }
 
 function start() {
@@ -3623,6 +3836,7 @@ function start() {
       S.tilstand = d.tilstand || null;
       if (d.spil) S.spil = d.spil;
       S.indst = d.indstillinger;
+      anvendKnapStoerrelse(S.indst.knapStoerrelse);
       document.title = S.indst.titel;
       $('loader').classList.add('skjul');
       render();

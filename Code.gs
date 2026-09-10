@@ -42,6 +42,7 @@ const STANDARD_INDSTILLINGER = [
   ['TilladSalgUdenLager', 'ja'],
   ['StandardMinLager', '3'],
   ['PantBeløb', '1'],
+  ['KnapStørrelse', '100'],
   ['SpilHest', 'nej'],
   ['SpilHestChance', '20'],
   ['SpilHestGælder', 'Øl'],
@@ -49,6 +50,11 @@ const STANDARD_INDSTILLINGER = [
   ['StandardGruppe', 'Beboere'],
   ['Grupper', 'Beboere, Ex\'ere']
 ];
+
+/* Hæves når fanerne eller kolonnerne ændrer sig. Så længe versionen står
+ * uændret, springer ensureSheets_ hele opsætningen over – ellers ville hver
+ * eneste sideindlæsning bruge et par sekunder på at tjekke og formatere ark. */
+const SKEMA_VERSION = '2026-09-10';
 
 const FARVER = ['#7c3aed', '#9333ea', '#a21caf', '#c026d3', '#db2777',
                 '#e11d48', '#f43f5e', '#ea580c', '#c2410c', '#b45309'];
@@ -73,7 +79,7 @@ function include(filnavn) {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('Køleskabet')
-    .addItem('Opret/reparer faner', 'ensureSheets_')
+    .addItem('Opret/reparer faner', 'reparerFaner')
     .addItem('Vis kiosk-URL', 'visUrl_')
     .addToUi();
 }
@@ -116,7 +122,15 @@ function getSheet_(navn) {
   return sh;
 }
 
-function ensureSheets_() {
+/**
+ * Opretter og reparerer faner. Tungt arbejde, så det køres kun når skemaet
+ * er nyt eller ændret — ikke ved hver sideindlæsning.
+ * @param {boolean=} tving Kør uanset gemt version (menupunktet bruger denne).
+ */
+function ensureSheets_(tving) {
+  var props = PropertiesService.getScriptProperties();
+  if (!tving && props.getProperty('SkemaVersion') === SKEMA_VERSION) return 'OK';
+
   var ss = getSs_();
   [SHEET_PERSONER, SHEET_PRODUKTER, SHEET_KOEB, SHEET_LAGER, SHEET_SPIL, SHEET_TILSTANDE,
    SHEET_BILLEDER, SHEET_AFREGNING, SHEET_INDSTILLINGER].forEach(function (n) { getSheet_(n); });
@@ -154,7 +168,15 @@ function ensureSheets_() {
   prod.getRange(2, 8, Math.max(prod.getMaxRows() - 1, 1), 1).setNumberFormat('0.00');
   var koeb = getSheet_(SHEET_KOEB);
   koeb.getRange(2, 9, Math.max(koeb.getMaxRows() - 1, 1), 2).setNumberFormat('0.00');
+
+  props.setProperty('SkemaVersion', SKEMA_VERSION);
   return 'OK';
+}
+
+/** Menupunktet skal altid køre det hele igennem. */
+function reparerFaner() {
+  ensureSheets_(true);
+  SpreadsheetApp.getUi().alert('Faner er tjekket og repareret.');
 }
 
 function readObjects_(navn) {
@@ -231,8 +253,12 @@ function hentStartdata() {
       tilladSalgUdenLager: sandt_(hentIndstilling_('TilladSalgUdenLager') || 'ja'),
       standardMinLager: parseInt(hentIndstilling_('StandardMinLager') || '3', 10),
       pantBeloeb: Number(hentIndstilling_('PantBeløb') || 1) || 0,
+      knapStoerrelse: Math.max(70, Math.min(200,
+        Number(hentIndstilling_('KnapStørrelse') || 100) || 100)),
       standardGruppe: hentIndstilling_('StandardGruppe') || 'Beboere',
-      grupper: (hentIndstilling_('Grupper') || 'Beboere, Ex\'ere')
+      gaesteGruppe: hentIndstilling_('GæsteGruppe') || 'Gæster',
+      tilladGaester: sandt_(hentIndstilling_('TilladGæster') || 'ja'),
+      grupper: (hentIndstilling_('Grupper') || 'Beboere, Ex\'ere, Gæster')
         .split(',').map(function (g) { return g.trim(); }).filter(String)
     },
     serverTid: new Date().toISOString()
@@ -972,6 +998,14 @@ function gemPerson(pin, p) {
   }
 }
 
+/** Adresserne på regnearket og på selve kiosken – så de altid kan findes igen. */
+function hentAdresser(pin) {
+  kraevAdmin_(pin);
+  var url = '';
+  try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  return { regneark: getSs_().getUrl(), kiosk: url };
+}
+
 function saetIndstilling(pin, noegle, vaerdi) {
   kraevAdmin_(pin);
   var sh = getSheet_(SHEET_INDSTILLINGER);
@@ -1005,6 +1039,26 @@ function hentBilleder() {
     if (r.ID && b) ud[String(r.ID)] = b;
   });
   return ud;
+}
+
+/**
+ * Et lille fingeraftryk af billedsamlingen: hvor mange og hvornår sidst rettet.
+ * Kiosken henter det først og springer de tunge billeddata over, hvis den
+ * allerede har dem — ellers ville hver indlæsning trække et par megabyte.
+ */
+function hentBilledStempel() {
+  var sh = getSheet_(SHEET_BILLEDER);
+  var sidste = sh.getLastRow();
+  if (sidste < 2) return '0|0';
+  // Kun ID og Opdateret læses – ikke selve billeddataene
+  var ider = sh.getRange(2, 1, sidste - 1, 1).getValues();
+  var tider = sh.getRange(2, 3, sidste - 1, 1).getValues();
+  var nyeste = 0;
+  for (var i = 0; i < tider.length; i++) {
+    var t = tider[i][0];
+    if (t instanceof Date && t.getTime() > nyeste) nyeste = t.getTime();
+  }
+  return ider.length + '|' + nyeste;
 }
 
 function gemBillede(pin, id, dataUri) {
@@ -1047,6 +1101,47 @@ function sletBillede(pin, id) {
 /* ------------------------------------------------------------------ */
 /* Selvbetjening – uden PIN                                            */
 /* ------------------------------------------------------------------ */
+
+/**
+ * Opretter en gæst uden administratorkode. Kan kun lave personer i
+ * gæstegruppen — gruppen kommer fra indstillingerne, ikke fra kaldet, så
+ * selvbetjeningen ikke kan bruges til at oprette beboere.
+ */
+function opretGaest(navn) {
+  if (!sandt_(hentIndstilling_('TilladGæster') || 'ja')) {
+    throw new Error('Gæster er slået fra lige nu.');
+  }
+  var rent = String(navn || '').replace(/\s+/g, ' ').trim();
+  if (rent.length < 2) throw new Error('Skriv et navn med mindst to bogstaver.');
+  if (rent.length > 40) throw new Error('Navnet er for langt.');
+
+  var gruppe = hentIndstilling_('GæsteGruppe') || 'Gæster';
+  var maks = Math.max(1, Number(hentIndstilling_('MaksGæster') || 200) || 200);
+
+  var laas = LockService.getScriptLock();
+  laas.waitLock(30000);
+  try {
+    var alle = readObjects_(SHEET_PERSONER);
+    var aktiveGaester = 0;
+    for (var i = 0; i < alle.length; i++) {
+      var p = alle[i];
+      if (!sandt_(p.Aktiv)) continue;
+      if (String(p.Navn).toLowerCase() === rent.toLowerCase()) {
+        throw new Error('Der findes allerede en "' + p.Navn + '". Vælg et andet navn.');
+      }
+      if (String(p.Gruppe || '') === gruppe) aktiveGaester++;
+    }
+    if (aktiveGaester >= maks) {
+      throw new Error('Der er ikke plads til flere gæster lige nu.');
+    }
+
+    var id = nytId_('P', alle);
+    var farve = FARVER[alle.length % FARVER.length];
+    getSheet_(SHEET_PERSONER).appendRow([id, rent, gruppe, farve, true, new Date()]);
+    return { id: id, gruppe: gruppe, personer: hentPersoner_() };
+  } finally { laas.releaseLock(); }
+}
+
 
 /* De to funktioner her kan kaldes uden administratorkode, fordi de hører
  * til den person der står ved skærmen. De kan kun røre ved præcis dét:

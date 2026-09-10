@@ -27,6 +27,8 @@
   --skygge:0 1px 2px rgba(24,39,75,.05), 0 2px 6px rgba(24,39,75,.06);
   --skygge-hoej:0 4px 12px rgba(24,39,75,.10);
   --radius:12px;
+  /* Knapstørrelse i kiosken. Sættes fra Indstillinger; 1 = normal. */
+  --skala:1;
 }
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -104,13 +106,19 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .indhold.med-kurv{padding-bottom:120px}
 
 .grid{display:grid;gap:13px}
-.grid-personer{grid-template-columns:repeat(auto-fill,minmax(152px,1fr))}
-.grid-produkter{grid-template-columns:repeat(auto-fill,minmax(148px,1fr))}
+.grid-personer{
+  grid-template-columns:repeat(auto-fill,minmax(calc(152px * var(--skala)),1fr));
+}
+.grid-produkter{
+  grid-template-columns:repeat(auto-fill,minmax(calc(148px * var(--skala)),1fr));
+}
 
 /* ---------- Personkort ---------- */
 .persontile{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-  min-height:140px;padding:16px 10px;border-radius:var(--radius);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:calc(10px * var(--skala));
+  min-height:calc(140px * var(--skala));padding:calc(16px * var(--skala)) 10px;
+  border-radius:var(--radius);
   background:var(--kort);border:1px solid var(--kant);box-shadow:var(--skygge);
   text-align:center;transition:box-shadow .12s,transform .08s;
 }
@@ -122,7 +130,26 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 }
 .avatar.foto{background-size:cover;background-position:center;color:transparent;overflow:hidden}
 .avatar.lille{width:44px;height:44px;font-size:16px}
-.persontile .navn{font-size:16px;font-weight:650;line-height:1.2;word-break:break-word;color:var(--tekst)}
+.persontile .navn{
+  font-size:calc(16px * var(--skala));font-weight:650;line-height:1.2;
+  word-break:break-word;color:var(--tekst);
+}
+.grid-personer .avatar{
+  width:calc(56px * var(--skala));height:calc(56px * var(--skala));
+  font-size:calc(20px * var(--skala));
+}
+
+/* Feltet hvor gæster opretter sig selv */
+.persontile.nygaest{
+  border-style:dashed;border-color:var(--kant-staerk);background:var(--flade);
+  box-shadow:none;
+}
+.persontile.nygaest:active{background:var(--kort-hover)}
+.persontile.nygaest .navn{color:var(--tekst-svag)}
+.avatar.plus{
+  background:var(--grad);color:#fff;font-size:30px;font-weight:400;line-height:1;
+  box-shadow:0 2px 10px rgba(180,50,120,.3);
+}
 
 /* ---------- Produktkort ---------- */
 .produkttile{
@@ -145,7 +172,7 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 }
 .medie .emoji{
   position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  font-size:64px;line-height:1;
+  font-size:calc(64px * var(--skala));line-height:1;
 }
 .medie .lagermaerke{
   position:absolute;left:7px;top:7px;max-width:calc(100% - 14px);
@@ -153,9 +180,13 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .produkttile .navn{
-  padding:10px 11px 0;font-size:15px;font-weight:650;line-height:1.2;color:var(--tekst);
+  padding:calc(10px * var(--skala)) 11px 0;font-size:calc(15px * var(--skala));
+  font-weight:650;line-height:1.2;color:var(--tekst);
 }
-.produkttile .pris{padding:2px 11px 12px;font-size:20px;font-weight:800;color:var(--brand)}
+.produkttile .pris{
+  padding:2px 11px calc(12px * var(--skala));font-size:calc(20px * var(--skala));
+  font-weight:800;color:var(--brand);
+}
 
 .tael{
   position:absolute;left:0;right:0;bottom:0;
@@ -164,7 +195,8 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
   border-top:1px solid var(--kant);
 }
 .tael-knap{
-  width:46px;height:40px;border-radius:8px;background:#fff;border:1px solid #f3bdd2;
+  width:calc(46px * var(--skala));height:calc(40px * var(--skala));
+  border-radius:8px;background:#fff;border:1px solid #f3bdd2;
   color:var(--brand-dyb);font-size:24px;font-weight:800;line-height:1;
   display:flex;align-items:center;justify-content:center;flex:0 0 auto;
 }
@@ -830,6 +862,30 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .showluk{
   position:absolute;right:18px;top:18px;width:46px;height:46px;border-radius:50%;
   background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:19px;
+}
+
+/* ---------- Knapstørrelse ---------- */
+.skalavaelger{display:flex;flex-wrap:wrap;gap:9px}
+.skalavaelger .chip{min-height:56px}
+.skalaeksempel{
+  margin-top:12px;padding:14px;border-radius:12px;
+  background:var(--flade);border:1px solid var(--kant);
+}
+.skalaeksempel .grid{margin:0}
+
+/* ---------- Adresser ---------- */
+.adresser{margin-top:4px}
+.adresse{
+  background:var(--flade);border:1px solid var(--kant);border-radius:11px;
+  padding:12px 14px;margin-bottom:9px;
+}
+.adresse .l{
+  font-size:12px;font-weight:700;color:var(--tekst-svag);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;
+}
+.adresse a{
+  font-size:14px;color:var(--blaa);word-break:break-all;font-weight:600;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
 }
 
 /* ---------- Sletning ---------- */

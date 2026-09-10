@@ -45,7 +45,9 @@
     koeb: [], lagerlog: [], afregnet: {}, spil: [],
     indst: { valuta:'kr', titel:'Køleskabet', fortrydSekunder:8, inaktivSekunder:60,
              tilladSalgUdenLager:true, standardMinLager:3, pantBeloeb:1,
-             standardGruppe:'Beboere', grupper:['Beboere',"Ex'ere"] },
+             knapStoerrelse:100,
+             standardGruppe:'Beboere', gaesteGruppe:'Gæster', tilladGaester:true,
+             grupper:['Beboere',"Ex'ere",'Gæster'] },
     spilOpsaet: { hest: { aktiv:true, chance:100, gaelderFor:'Øl', antalHeste:4 } },
     pin: '1234',
     naesteKoeb: 1
@@ -163,11 +165,14 @@
       return { tilstande: JSON.parse(JSON.stringify(db.tilstande)), aktiv: null };
     },
     hentBilleder: function () { return JSON.parse(JSON.stringify(db.billeder)); },
+    hentBilledStempel: function () {
+      return Object.keys(db.billeder).length + '|' + (db.billedTid || 0);
+    },
     gemBillede: function (pin, id, d) {
       tjek(pin);
       if (String(d).indexOf('data:image/') !== 0) throw new Error('Ugyldigt billedformat.');
       if (String(d).length > 45000) throw new Error('Billedet fylder for meget.');
-      db.billeder[id] = d; return true;
+      db.billeder[id] = d; db.billedTid = Date.now(); return true;
     },
     sletBillede: function (pin, id) { tjek(pin); delete db.billeder[id]; return true; },
     tjekPin: function (pin) { return String(pin) === db.pin; },
@@ -372,11 +377,32 @@
       return { ok:true };
     },
 
+    opretGaest: function (navn) {
+      if (!db.indst.tilladGaester) throw new Error('Gæster er slået fra lige nu.');
+      var rent = String(navn||'').replace(/\s+/g,' ').trim();
+      if (rent.length < 2) throw new Error('Skriv et navn med mindst to bogstaver.');
+      if (rent.length > 40) throw new Error('Navnet er for langt.');
+      var gruppe = db.indst.gaesteGruppe || 'Gæster';
+      var antal = 0;
+      for (var i=0;i<db.personer.length;i++){
+        var p = db.personer[i];
+        if (!p.aktiv) continue;
+        if (p.navn.toLowerCase() === rent.toLowerCase())
+          throw new Error('Der findes allerede en "'+p.navn+'". Vælg et andet navn.');
+        if (p.gruppe === gruppe) antal++;
+      }
+      if (antal >= 200) throw new Error('Der er ikke plads til flere gæster lige nu.');
+      var id = 'P'+(db.personer.length+1);
+      db.personer.push({ id:id, navn:rent, gruppe:gruppe,
+        farve:FARVER[db.personer.length % FARVER.length], aktiv:true });
+      return { id:id, gruppe:gruppe, personer:JSON.parse(JSON.stringify(db.personer)) };
+    },
+
     gemEgetBillede: function (personId, d) {
       if (!db.personer.some(function(p){return p.id===personId && p.aktiv;}))
         throw new Error('Ukendt person.');
       if (String(d).indexOf('data:image/') !== 0) throw new Error('Ugyldigt billedformat.');
-      db.billeder[personId] = d;
+      db.billeder[personId] = d; db.billedTid = Date.now();
       return { ok:true, id:personId, billede:d };
     },
     sletEgetBillede: function (personId) {
@@ -513,13 +539,20 @@
         travlesteUgedag:dagN[uT], travlesteTime:tT, loeb:loeb, ordninger:ordninger };
     },
     saetAfregnet: function (pin,m,v) { tjek(pin); db.afregnet[m]=v; return v; },
+    hentAdresser: function (pin) {
+      tjek(pin);
+      return { regneark:'https://docs.google.com/spreadsheets/d/EKSEMPEL/edit',
+               kiosk:'https://script.google.com/macros/s/EKSEMPEL/exec' };
+    },
     saetIndstilling: function (pin,n,v) {
       tjek(pin);
       var map={Titel:'titel',Valuta:'valuta',FortrydSekunder:'fortrydSekunder',
                InaktivSekunder:'inaktivSekunder',StandardMinLager:'standardMinLager',
-               StandardGruppe:'standardGruppe'};
+               StandardGruppe:'standardGruppe','PantBeløb':'pantBeloeb',
+               'KnapStørrelse':'knapStoerrelse'};
       if(n==='AdminPin') db.pin=String(v);
       else if(n==='TilladSalgUdenLager') db.indst.tilladSalgUdenLager = (v==='ja');
+      else if(n==='TilladGæster') db.indst.tilladGaester = (v==='ja');
       else if(n==='SpilHest') db.spilOpsaet.hest.aktiv = (String(v)==='ja');
       else if(n==='SpilHestChance') db.spilOpsaet.hest.chance = parseInt(v,10)||0;
       else if(n==='SpilHestAntal') db.spilOpsaet.hest.antalHeste = parseInt(v,10)||4;

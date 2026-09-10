@@ -34,21 +34,39 @@ Navnene skal matche præcist — `Index.html` henter `Styles` og `JavaScript` in
 
 ## Opsætning (ca. 10 minutter, én gang)
 
-1. **Opret et Google Sheet.** Kald det fx `Køleskabet`. Fanerne oprettes selv.
-2. **Udvidelser → Apps Script.** Et scriptprojekt åbner.
-3. **Indsæt koden.**
-   - Slet indholdet af `Code.gs`, indsæt hele `Code.gs` herfra.
-   - `Filer → +` → `HTML` → navngiv `Index` → indsæt `Index.html`.
-   - Samme for `Styles` og `JavaScript`.
-4. **Manifest (valgfrit, men anbefalet).** `Projektindstillinger` → sæt flueben ved
-   *Vis appsscript.json*, gå tilbage til editoren og indsæt indholdet af
-   `appsscript.json`.
-5. **Kør `ensureSheets_` én gang** (vælg funktionen i editoren, tryk *Kør*).
-   Google beder om tilladelse — godkend. Fanerne oprettes med det samme.
-6. **Udrul:** `Udrul → Ny udrulning → Webapp`
+> Indtil dette er gjort, findes der **intet regneark og ingen kiosk**.
+> `test/`-udgaven er kun en attrap: dens data lever i browserens hukommelse og
+> forsvinder når fanen lukkes. Intet du taster der, bliver gemt.
+
+1. **Opret et Google Sheet.** Gå til `sheets.google.com`, lav et tomt ark og kald
+   det fx `Køleskabet`. Det er *dette* ark der bliver jeres database — fanerne
+   opretter app'en selv. Gem linket; det er her I kan rette i alting hjemmefra.
+2. **Udvidelser → Apps Script.** Et scriptprojekt åbner, bundet til arket.
+3. **Indsæt koden.** Navnene skal ramme præcist, ellers finder `Index` ikke
+   de andre filer:
+
+   | Fil herfra | Sådan oprettes den | Navn i Apps Script |
+   |---|---|---|
+   | `Code.gs` | findes i forvejen — slet indholdet og indsæt | `Code.gs` |
+   | `Index.html` | `Filer → + → HTML` | `Index` |
+   | `Styles.html` | `Filer → + → HTML` | `Styles` |
+   | `JavaScript.html` | `Filer → + → HTML` | `JavaScript` |
+
+   Apps Script tilføjer selv `.html`, så skriv kun `Index`, ikke `Index.html`.
+4. **Manifest (anbefalet).** `Projektindstillinger` → flueben ved
+   *Vis appsscript.json* → gå tilbage til editoren, åbn filen og indsæt
+   indholdet af `appsscript.json`. Det sætter tidszonen til dansk.
+5. **Kør `ensureSheets_` én gang.** Vælg funktionen i rullemenuen øverst og tryk
+   *Kør*. Google beder om tilladelse første gang — godkend den. Bagefter har
+   arket alle sine faner med eksempeldata.
+6. **Udrul:** `Udrul → Ny udrulning → Vælg type → Webapp`
    - *Kør som:* **Mig**
    - *Hvem har adgang:* **Alle** (så kiosken virker uden login)
-   - Kopiér URL'en.
+   - Tryk *Udrul*, godkend, og **kopiér web-app-URL'en**. Det er kiosken.
+7. **Gem begge links** som bogmærker: regnearket og kiosken. Kioskens adresse
+   virker fra enhver enhed — også din telefon — så priser og lager kan styres
+   hjemmefra med PIN-koden. Begge links kan altid findes igen i kiosken under
+   *⚙️ → Indstillinger → Vis links*.
 
 > **Om adgang:** "Alle" betyder at alle med linket kan bruge kiosken. Linket er
 > ikke til at gætte, og alt administrativt ligger bag PIN-koden. Vil I hellere
@@ -105,8 +123,24 @@ Skal kun nogle af dem med ud, åbner man kurven og trykker på linjens
 Kvitteringen står med **Fortryd** i 8 sekunder, hvis man ramte forkert.
 Efter 60 sekunder uden aktivitet springer skærmen selv tilbage til navnelisten.
 
-Personer er delt i **Beboere** og **Ex'ere** — beboere vises som standard,
-ex'ere er ét tryk væk. Grupperne kan omdøbes eller udvides under Indstillinger.
+Personer er delt i **Beboere**, **Ex'ere** og **Gæster** — beboere vises som
+standard, resten er ét tryk væk. Grupperne kan omdøbes eller udvides under
+Indstillinger.
+
+### Gæster opretter sig selv
+Under **Gæster** ligger et felt der hedder *Ny gæst*. Man skriver sit navn og er
+med med det samme — ingen adgangskode, ingen ventetid på at nogen med PIN'en
+kommer forbi. Bagefter køber man som alle andre, og købene ryger på ens egen
+regning i månedsopgørelsen.
+
+Feltet vises kun under *Gæster* og *Alle*, så beboernes hverdagsskærm ikke
+fyldes op. Selvbetjeningen kan **kun** lave gæster: gruppen kommer fra
+indstillingerne og ikke fra det gæsten taster, så den kan ikke bruges til at
+oprette en beboer. Der er desuden grænser — navnet skal være mellem 2 og 40
+tegn, det må ikke være optaget af en anden, og der er et loft på antal gæster.
+
+Skal der ikke kunne oprettes gæster uden for fester, slås det fra under
+*⚙️ → Indstillinger*.
 
 ### Administration (⚙️ øverst til højre, PIN)
 Standard-PIN er **1234** — skift den under *Indstillinger* med det samme.
@@ -130,7 +164,15 @@ Standard-PIN er **1234** — skift den under *Indstillinger* med det samme.
   webcam**. Skal en person ud, så fjern fluebenet *Vis i kiosken* eller flyt dem
   til *Ex'ere* — så bevares hele deres købshistorik.
 - **Månedsopgørelse** — se nedenfor.
-- **Indstillinger** — PIN, titel, valuta, grupper, timeouts, lagerregler.
+- **Indstillinger** — PIN, titel, valuta, grupper, gæsteadgang, timeouts,
+  lagerregler, pantbeløb og **størrelsen på knapperne i kiosken**.
+
+  Knapstørrelsen har fire trin — *Lille*, *Normal*, *Stor*, *Ekstra stor* — med
+  en levende forhåndsvisning ved siden af, så man kan se resultatet med det
+  samme. Den ændrer både felternes højde, skriftstørrelsen, avatarerne og hvor
+  mange der er plads til på en række: fra fem i bredden ved *Lille* til tre ved
+  *Stor*. Kun kioskskærmene skalerer — administrationens lister bliver som de
+  er, så de ikke bliver uoverskuelige.
 
 ### Pant
 Pant er et fast beløb pr. stk. — som standard **1 kr** — der lægges oveni, når
@@ -351,6 +393,25 @@ spørge om lov til kameraet første gang. Bliver den afvist eller er der intet
 kamera, siger app'en det og falder tilbage til *Vælg fil*.
 
 ---
+
+## Ydelse
+
+Tre ting holder kiosken hurtig, og de er værd at kende hvis nogen skal rette i
+koden:
+
+- **Billeddata ligger i CSS, ikke i markuppen.** Skærmen tegnes forfra ved hvert
+  tryk, og skrives billederne ind i HTML'en, betyder det at flere hundrede
+  kilobyte skal bygges og parses hver gang. I stedet skrives de som CSS-regler
+  én gang (`opdaterBilledStil`), og markuppen indeholder kun et klassenavn.
+  Det tog én render fra 773 kB og 11 ms ned til 5 kB og 0,3 ms.
+- **`ensureSheets_` springer over.** Opsætning og formatering af faner er tungt
+  i Apps Script — hver `getRange` er en tur til serveren. Det køres kun når
+  `SKEMA_VERSION` er ny. **Hæv den konstant hvis du ændrer faner eller
+  kolonner**, ellers bliver ændringen ikke oprettet hos dem der kører i forvejen.
+  Menupunktet *Opret/reparer faner* kører altid det hele igennem.
+- **Billeder hentes kun når de er ændret.** Kiosken henter først et lille
+  stempel (antal + seneste rettelse). Passer det med det den har i forvejen,
+  springes de tunge data over. Det sparer et par megabyte ved hver indlæsning.
 
 ## Test uden Google — kun til udvikling
 
