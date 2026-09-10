@@ -1166,6 +1166,36 @@ function nulstilInaktiv() {
   }, (S.indst.inaktivSekunder || 60) * 1000);
 }
 
+/* ---------- Fuld skærm ---------- */
+
+/* Knappen vises kun når den er nødvendig: er app'en installeret som app,
+ * eller allerede i fuld skærm, er der ikke noget at trykke på.            */
+function erFuldSkaerm() {
+  return !!(document.fullscreenElement || document.webkitFullscreenElement);
+}
+function erInstalleret() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) ||
+         window.navigator.standalone === true;
+}
+function behoeverFuldSkaerm() {
+  return !erFuldSkaerm() && !erInstalleret() &&
+         !!(document.documentElement.requestFullscreen ||
+            document.documentElement.webkitRequestFullscreen);
+}
+function skiftFuldSkaerm() {
+  var e = document.documentElement;
+  try {
+    if (erFuldSkaerm()) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      (e.requestFullscreen || e.webkitRequestFullscreen).call(e);
+    }
+  } catch (f) { toast('Fuld skærm kunne ikke slås til', true); }
+}
+['fullscreenchange', 'webkitfullscreenchange'].forEach(function (h) {
+  document.addEventListener(h, function () { render(); });
+});
+
 /* ---------- Hold skærmen tændt ---------- */
 
 var wakeLock = null;
@@ -1562,6 +1592,9 @@ function renderPersoner() {
   h += '  <h1>' + esc(S.indst.titel) + '</h1>';
   h += '  <div class="sub">Tryk på dit navn</div>';
   h += '  <div class="spacer"></div>';
+  if (behoeverFuldSkaerm()) {
+    h += '  <button class="ikonknap" data-fuldskaerm="1" title="Fuld skærm">⛶</button>';
+  }
   h += '  <button class="ikonknap" data-gaa="admin" title="Administration">⚙️</button>';
   h += '</div>';
 
@@ -4277,7 +4310,7 @@ function gemIndstillinger() {
 document.addEventListener('click', function (ev) {
   var t = ev.target.closest('[data-person],[data-produkt],[data-gaa],[data-gruppe],[data-kategori],' +
     '[data-plus],[data-minus],[data-koeb],[data-toemkurv],[data-kurvaaben],[data-fane],[data-genindlaes],' +
-    '[data-pantlinje],[data-pantalle],[data-minside],' +
+    '[data-pantlinje],[data-pantalle],[data-minside],[data-fuldskaerm],' +
     '[data-startshow],[data-aarsperson],[data-aarsfane],' +
     '[data-nytprodukt],[data-redigerprodukt],[data-pris],[data-nyperson],[data-redigerperson],' +
     '[data-juster],[data-paafyld],[data-optael],[data-indkoeb],[data-lagerlog],' +
@@ -4301,6 +4334,7 @@ document.addEventListener('click', function (ev) {
   if (a('data-toemkurv')) { S.kurv = {}; S.kurvAaben = false; render(); return; }
   if (a('data-kurvaaben')) { S.kurvAaben = !S.kurvAaben; render(); return; }
   if (a('data-minside')) { clearTimeout(inaktivTimer); visMinSide(); return; }
+  if (a('data-fuldskaerm')) { skiftFuldSkaerm(); return; }
   if (a('data-koeb')) { gennemfoerKoeb(); return; }
   if (a('data-gruppe')) { S.gruppe = a('data-gruppe'); render(); return; }
   if (a('data-kategori')) { S.kategori = a('data-kategori'); render(); return; }

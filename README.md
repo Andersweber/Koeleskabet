@@ -5,8 +5,8 @@ er der tilbage — og en månedsopgørelse til den der sender regninger ud.
 Bygget til drikkevarer, med pant og festivalpriser.
 
 Bygget som en **Google Apps Script web app oven på ét Google Sheet**. Der er
-ingen server at drifte og intet at installere: Google hoster app'en sammen med
-regnearket, og Chromebooken åbner bare én URL i fuld skærm.
+ingen server at drifte, intet at installere og intet program at starte: Google
+hoster app'en sammen med regnearket, og Chromebooken åbner bare én URL.
 
 ---
 
@@ -62,20 +62,35 @@ Ny version → Udrul`. URL'en er den samme.
 
 ## Chromebooken
 
-1. Åbn URL'en i Chrome.
-2. **Gør den til en app:** `⋮ → Cast, gem og del → Installer side som app`.
-   Den får sit eget ikon og åbner uden adresselinje.
-3. **Fuld skærm:** tryk `F11` (eller søgeknappen + fuldskærmstasten).
-4. **Åbn automatisk ved opstart:** `Indstillinger → Ved opstart → Åbn en bestemt
-   side` → indsæt URL'en.
-5. **Lad skærmen blive tændt:** `Indstillinger → Enhed → Strøm → Hold skærmen
-   tændt, når enheden er tilsluttet`. App'en beder derudover selv om
-   *wake lock*, så skærmen ikke dæmpes af sig selv.
+**Der er ikke noget program at køre, og ingen kommandolinje involveret.**
+Kiosken er en almindelig webside på en URL. Chromebooken skal bare åbne den —
+resten er engangsopsætning, som gøres med musen.
+
+1. **Åbn URL'en** i Chrome (den I fik ved udrulningen).
+2. **Gør den til en app.** `⋮ → Cast, gem og del → Installer side som app`.
+   Så får den sit eget ikon i skuffen, åbner i sit eget vindue uden adresselinje
+   og uden faneblade — det er dét man vil have på en kiosk.
+3. **Sæt den på hylden.** Højreklik ikonet → *Fastgør til hylde*. Ét klik, så er
+   den oppe.
+4. **Start den automatisk ved opstart.** `Indstillinger → Ved opstart → Åbn en
+   bestemt side eller nogle sider` → indsæt URL'en. Så er kiosken klar af sig
+   selv, også efter en strømafbrydelse.
+5. **Lad skærmen blive tændt.** `Indstillinger → Enhed → Strøm → Hold skærmen
+   tændt, når enheden er tilsluttet`. App'en beder derudover selv om *wake lock*,
+   så skærmen ikke dæmpes.
+
+**Fuld skærm** behøver I ikke gøre noget for: har I installeret den som app,
+fylder den allerede vinduet. Ellers er der en **⛶-knap** øverst til højre i
+kiosken — den vises kun når den er nødvendig og forsvinder af sig selv bagefter.
+`F11` virker naturligvis også.
 
 Mister Chromebooken nettet, bliver køb lagt i kø lokalt og sendt automatisk, når
 forbindelsen er tilbage. Det står i en blå bjælke i toppen imens.
 
----
+> **Rigtig kiosktilstand** — hvor Chromebooken booter direkte ind i app'en og
+> ikke kan lukkes ned — kræver at maskinen er meldt ind i en Google Workspace
+> med enhedsstyring. Det er ikke muligt på en privat Chromebook, og de fem trin
+> ovenfor kommer i praksis tæt nok på.
 
 ## Sådan bruges den
 
@@ -337,13 +352,21 @@ kamera, siger app'en det og falder tilbage til *Vælg fil*.
 
 ---
 
-## Test uden Google
+## Test uden Google — kun til udvikling
 
-`test/index.html` er hele brugerfladen med en opdigtet backend (20 personer,
-20 varer, et par hundrede køb). Kør fx:
+> Dette afsnit har **intet med Chromebooken eller driften at gøre.** Kiosken
+> kører uden nogen server. Det følgende er kun til brug på en udviklermaskine.
+
+`test/index.html` er hele brugerfladen bygget sammen med en opdigtet backend
+(20 personer, 20 varer, et par hundrede køb), så man kan klikke rundt uden at
+røre det rigtige regneark. Den skal serveres over http for at browseren tillader
+kamera og lyd:
 
 ```bash
 python3 -m http.server 8712 --directory test
 ```
 
-Åbn `http://localhost:8712`. Intet af det rører jeres rigtige regneark.
+Åbn derefter `http://localhost:8712`.
+
+Filen er en sammenbygget kopi af `Styles.html` og `JavaScript.html`. Retter du i
+de rigtige filer, skal den bygges om, før ændringerne kan ses i testudgaven.
