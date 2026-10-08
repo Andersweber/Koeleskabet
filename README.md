@@ -56,7 +56,7 @@ Navnene skal matche præcist — `Index.html` henter `Styles` og `JavaScript` in
 4. **Manifest (anbefalet).** `Projektindstillinger` → flueben ved
    *Vis appsscript.json* → gå tilbage til editoren, åbn filen og indsæt
    indholdet af `appsscript.json`. Det sætter tidszonen til dansk.
-5. **Kør `ensureSheets_` én gang.** Vælg funktionen i rullemenuen øverst og tryk
+5. **Kør `reparerFaner` én gang.** Åbn `Code.gs`, vælg funktionen i rullemenuen øverst og tryk
    *Kør*. Google beder om tilladelse første gang — godkend den. Bagefter har
    arket alle sine faner med eksempeldata.
 6. **Udrul:** `Udrul → Ny udrulning → Vælg type → Webapp`
@@ -77,6 +77,67 @@ Efter ændringer i koden: `Udrul → Administrer udrulninger → blyanten → Ve
 Ny version → Udrul`. URL'en er den samme.
 
 ---
+
+## Deling — hvem skal have hvad
+
+Der er to adresser, og de fleste skal kun bruge den ene.
+
+### Kiosk-URL'en → alle
+Web-app-adressen fra udrulningen. **Den skal ikke deles i Google** — den virker
+bare, for alle, på enhver enhed, uden login. Send den i husets gruppe, sæt den
+på Chromebooken, gem den på telefonen.
+
+Med den kan man købe, se sin egen historik og skifte sit eget billede. Alt
+administrativt ligger bag PIN-koden, som I giver til dem der skal styre priser
+og lager.
+
+Web-app'en kører **som den der udrullede den** — altså din konto. Derfor skal
+ingen andre have adgang til regnearket for at kiosken virker. Køb skrives af
+dig, uanset hvem der står ved skærmen.
+
+### Regnearket → kun dem der skal grave i data
+Del kun arket med dem der skal se rådata eller rette direkte i fanerne — typisk
+den der laver regnskabet.
+
+1. Åbn regnearket → **Del** øverst til højre.
+2. Skriv deres Gmail-adresse.
+3. Vælg rolle:
+   - **Fremviser** — kan se alt, men ikke rette. Fint til den nysgerrige.
+   - **Redaktør** — kan rette i data og rydde op. Til økonomi-personen.
+4. Send.
+
+> **Vær opmærksom:** den der har adgang til regnearket kan også åbne
+> `Udvidelser → Apps Script` og læse eller ændre koden — og kan se **PIN-koden**,
+> der står i klartekst i fanen *Indstillinger*. Del derfor kun arket med dem I
+> ville give administratorrettigheder alligevel. Alle andre har rigeligt i
+> kiosk-URL'en.
+
+Undlad **Alle med linket** på regnearket. Der ligger hele husets forbrug, og
+linket kan vandre videre. Kiosk-URL'en er den der må deles frit.
+
+### Skal en anden overtage driften?
+Web-app'en hænger på den konto der udrullede den. Skal en anden stå for den,
+er den reneste vej at gøre dem til **ejer** af regnearket (Del → deres navn →
+*Overdrag ejerskab*) og lade dem udrulle web-app'en på ny fra deres egen konto.
+Så får I en ny kiosk-URL, som skal opdateres på Chromebooken.
+
+---
+
+## Kamera: kør kiosken fra GitHub Pages (anbefalet)
+
+Google viser Apps Script-web-apps i en ramme, der ikke må bruge kameraet. Derfor
+ligger den **samme kiosk** også som en almindelig webside i `docs/`, der taler med
+regnearket gennem Apps Script som API. Her virker webcam-knappen normalt.
+
+1. Udrul Apps Script på ny med den nyeste `Code.gs` (`Implementer → Administrer
+   implementeringer → blyanten → Ny version`) og kopiér web-app-URL'en.
+2. Åbn `docs/config.js` og indsæt URL'en mellem citationstegnene.
+3. Kør `python3 build.py` (kun nødvendigt hvis du har ændret Index/Styles/JavaScript).
+4. Commit og push. På GitHub: *Settings → Pages → Branch: main, mappe `/docs`*.
+5. Åbn `https://<brugernavn>.github.io/Koeleskabet/` på Chromebooken, tillad
+   kameraet og installér siden som app som beskrevet nedenfor.
+
+Siden indeholder ingen data, kun kode — alt ligger stadig i dit regneark.
 
 ## Chromebooken
 
@@ -388,9 +449,10 @@ involveret. De caches lokalt på Chromebooken, så kiosken starter hurtigt.
 Har en person eller vare intet billede, bruges initialer på farvet baggrund
 henholdsvis et emoji-ikon.
 
-**Bemærk:** webcam-optagelsen er ikke afprøvet på jeres Chromebook — Chrome vil
-spørge om lov til kameraet første gang. Bliver den afvist eller er der intet
-kamera, siger app'en det og falder tilbage til *Vælg fil*.
+**Bemærk:** Google viser Apps Script-web-apps i en beskyttet ramme uden lov til
+kameraet, så *Tag med webcam* virker normalt ikke i den udrullede app. Så skifter
+knappen til **Åbn kamera-app**, der bruger Chromebookens egen kamera-app via
+filvælgeren — eller man bruger *Vælg fil*. Webcam-knappen virker i `test/`-udgaven.
 
 ---
 

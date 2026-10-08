@@ -1,4 +1,1000 @@
-<script>
+<!DOCTYPE html>
+<html lang="da">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Køleskabet</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="ikon.svg">
+    <style>
+:root{
+  --bg:#eef1f6;
+  --flade:#f7f9fc;
+  --kort:#ffffff;
+  --kort-hover:#f4f7fb;
+  --kant:#e3e8f0;
+  --kant-staerk:#cfd7e3;
+  --lilla:#8b3fd6;
+  --lilla-dyb:#6d28c9;
+  --violet:#7c3aed;
+  --violet-blod:#f2ebfe;
+  --orange:#ff8a3d;
+  --grad:linear-gradient(100deg,#8b3fd6 0%,#c92fa8 34%,#e5407f 62%,#ff8a3d 100%);
+  --grad-dyb:linear-gradient(100deg,#7734bd 0%,#b02795 34%,#cc3670 62%,#f0761f 100%);
+  --tekst:#1b2432;
+  --tekst-svag:#6b7890;
+  --brand:#e5407f;
+  --brand-dyb:#c92a68;
+  --brand-blod:#fdeaf2;
+  --rod:#e5484d;
+  --rod-blod:#fdecec;
+  --gul:#e08700;
+  --gul-blod:#fdf3e3;
+  --blaa:#7c3aed;
+  --blaa-blod:#f2ebfe;
+  --skygge:0 1px 2px rgba(24,39,75,.05), 0 2px 6px rgba(24,39,75,.06);
+  --skygge-hoej:0 4px 12px rgba(24,39,75,.10);
+  --radius:12px;
+  /* Knapstørrelse i kiosken. Sættes fra Indstillinger; 1 = normal. */
+  --skala:1;
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{
+  background:var(--bg);
+  color:var(--tekst);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:16px;
+  line-height:1.4;
+  overflow:hidden;
+  touch-action:manipulation;
+  user-select:none;
+  -webkit-user-select:none;
+  -webkit-font-smoothing:antialiased;
+}
+button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit}
+button{cursor:pointer;border:none;background:none}
+input,select,textarea{user-select:text;-webkit-user-select:text}
+
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+
+/* ---------- Topbjælke ---------- */
+.top{
+  display:flex;align-items:center;gap:14px;
+  padding:0 20px;min-height:66px;flex:0 0 auto;
+  background:var(--grad);color:#fff;
+}
+.top h1{font-size:21px;font-weight:700;letter-spacing:-.2px}
+.top .sub{font-size:14px;color:rgba(255,255,255,.62);font-weight:500}
+.top .spacer{flex:1}
+
+.ikonknap{
+  width:46px;height:46px;border-radius:11px;background:rgba(255,255,255,.12);
+  display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;
+  transition:background .12s;
+}
+.ikonknap:active{transform:scale(.94);background:rgba(255,255,255,.22)}
+
+.tilbage{
+  display:flex;align-items:center;gap:8px;height:46px;padding:0 18px 0 14px;
+  border-radius:11px;background:rgba(255,255,255,.12);color:#fff;
+  font-size:16px;font-weight:600;flex:0 0 auto;
+}
+.tilbage:active{transform:scale(.97);background:rgba(255,255,255,.22)}
+
+.person-chip{display:flex;align-items:center;gap:11px;min-width:0}
+.person-chip .avatar{width:42px;height:42px;font-size:16px;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.person-chip .navn{font-size:20px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.person-chip{
+  background:rgba(255,255,255,.12);border-radius:999px;padding:5px 16px 5px 5px;color:#fff;
+}
+.person-chip:active{transform:scale(.97);background:rgba(255,255,255,.22)}
+.person-chip .chip-pil{font-size:22px;opacity:.7;margin-left:2px}
+
+/* ---------- Filterlinje ---------- */
+.filterbar{
+  display:flex;gap:8px;padding:11px 20px;overflow-x:auto;flex:0 0 auto;
+  background:var(--kort);border-bottom:1px solid var(--kant);scrollbar-width:none;
+}
+.filterbar::-webkit-scrollbar{display:none}
+.chip{
+  min-height:44px;padding:0 17px;border-radius:9px;background:var(--kort);
+  border:1px solid var(--kant-staerk);font-size:15px;font-weight:600;color:var(--tekst-svag);
+  white-space:nowrap;flex:0 0 auto;display:flex;align-items:center;gap:7px;
+  transition:all .12s;
+}
+.chip:active{transform:scale(.96)}
+.chip.aktiv{background:var(--grad);color:#fff;border-color:transparent}
+.chip.lille{min-height:40px;padding:0 13px;font-size:14px}
+.chip[disabled]{opacity:.35;pointer-events:none}
+
+/* ---------- Indhold ---------- */
+.indhold{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:18px 20px 22px}
+.indhold.med-kurv{padding-bottom:120px}
+
+.grid{display:grid;gap:13px}
+.grid-personer{
+  grid-template-columns:repeat(auto-fill,minmax(calc(152px * var(--skala)),1fr));
+}
+.grid-produkter{
+  grid-template-columns:repeat(auto-fill,minmax(calc(148px * var(--skala)),1fr));
+}
+
+/* ---------- Personkort ---------- */
+.persontile{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:calc(10px * var(--skala));
+  min-height:calc(140px * var(--skala));padding:calc(16px * var(--skala)) 10px;
+  border-radius:var(--radius);
+  background:var(--kort);border:1px solid var(--kant);box-shadow:var(--skygge);
+  text-align:center;transition:box-shadow .12s,transform .08s;
+}
+.persontile:active{transform:scale(.97);box-shadow:var(--skygge-hoej);background:var(--kort-hover)}
+.avatar{
+  width:56px;height:56px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:700;color:#fff;flex:0 0 auto;letter-spacing:.5px;
+}
+.avatar.foto{background-size:cover;background-position:center;color:transparent;overflow:hidden}
+.avatar.lille{width:44px;height:44px;font-size:16px}
+.persontile .navn{
+  font-size:calc(16px * var(--skala));font-weight:650;line-height:1.2;
+  word-break:break-word;color:var(--tekst);
+}
+.grid-personer .avatar{
+  width:calc(56px * var(--skala));height:calc(56px * var(--skala));
+  font-size:calc(20px * var(--skala));
+}
+
+/* Feltet hvor gæster opretter sig selv */
+.persontile.nygaest{
+  border-style:dashed;border-color:var(--kant-staerk);background:var(--flade);
+  box-shadow:none;
+}
+.persontile.nygaest:active{background:var(--kort-hover)}
+.persontile.nygaest .navn{color:var(--tekst-svag)}
+.avatar.plus{
+  background:var(--grad);color:#fff;font-size:30px;font-weight:400;line-height:1;
+  box-shadow:0 2px 10px rgba(180,50,120,.3);
+}
+
+/* ---------- Produktkort ---------- */
+.produkttile{
+  position:relative;display:flex;flex-direction:column;align-items:stretch;
+  border-radius:var(--radius);background:var(--kort);border:1px solid var(--kant);
+  box-shadow:var(--skygge);overflow:hidden;text-align:center;cursor:pointer;
+  transition:box-shadow .12s,transform .08s;
+}
+.produkttile:active{transform:scale(.97);box-shadow:var(--skygge-hoej)}
+/* Tryk på tælleknapperne må ikke få hele kortet til at "klikke" */
+.produkttile:has(.tael-knap:active):active{transform:none}
+/* Kvadratisk billedfelt – lagermærke og tæller ligger ovenpå, så alle
+   varekort har samme højde uanset om varen ligger i kurven. */
+.medie{
+  position:relative;width:100%;aspect-ratio:1/1;background:var(--flade);
+  border-bottom:1px solid var(--kant);overflow:hidden;flex:0 0 auto;
+}
+.medie .produktbillede{
+  position:absolute;inset:0;background-size:cover;background-position:center;
+}
+.medie .emoji{
+  position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:calc(64px * var(--skala));line-height:1;
+}
+.medie .lagermaerke{
+  position:absolute;left:7px;top:7px;max-width:calc(100% - 14px);
+  background:rgba(255,255,255,.93);backdrop-filter:blur(4px);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.produkttile .navn{
+  padding:calc(10px * var(--skala)) 11px 0;font-size:calc(15px * var(--skala));
+  font-weight:650;line-height:1.2;color:var(--tekst);
+}
+.produkttile .pris{
+  padding:2px 11px calc(12px * var(--skala));font-size:calc(20px * var(--skala));
+  font-weight:800;color:var(--brand);
+}
+
+.tael{
+  position:absolute;left:0;right:0;bottom:0;
+  display:flex;align-items:center;justify-content:center;gap:10px;padding:6px;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(6px);
+  border-top:1px solid var(--kant);
+}
+.tael-knap{
+  width:calc(46px * var(--skala));height:calc(40px * var(--skala));
+  border-radius:8px;background:#fff;border:1px solid #f3bdd2;
+  color:var(--brand-dyb);font-size:24px;font-weight:800;line-height:1;
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+}
+.tael-knap:active{transform:scale(.9);background:var(--brand);color:#fff;border-color:var(--brand)}
+.tael-antal{min-width:26px;text-align:center;font-size:20px;font-weight:800;color:var(--brand-dyb)}
+.produkttile.udsolgt{opacity:.55}
+.produkttile.udsolgt .pris{color:var(--tekst-svag)}
+.produkttile.valgt{border-color:var(--brand);box-shadow:0 0 0 2px rgba(229,64,127,.25),var(--skygge)}
+
+.lagermaerke{
+  display:inline-block;font-size:12px;font-weight:700;padding:3px 10px;border-radius:6px;
+  background:var(--flade);color:var(--tekst-svag);border:1px solid var(--kant);
+}
+.lagermaerke.lav{background:var(--gul-blod);color:var(--gul);border-color:#f5dfba}
+.lagermaerke.tom{background:#eceff4;color:#5c6880;border-color:var(--kant-staerk)}
+
+/* ---------- Kurv ---------- */
+.kurvbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:40;
+  background:var(--kort);border-top:1px solid var(--kant);
+  padding:11px 20px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 -4px 16px rgba(24,39,75,.08);
+}
+.kurvbar .info{
+  flex:1;min-width:0;text-align:left;background:none;border:none;padding:0;
+}
+.kurvbar .info .linje1{font-size:13px;color:var(--tekst-svag);font-weight:600}
+.kurvbar .info .linje2{font-size:25px;font-weight:800;letter-spacing:-.4px}
+
+.stor-knap{
+  min-height:58px;padding:0 26px;border-radius:11px;background:var(--grad);color:#fff;
+  font-size:19px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:9px;
+  box-shadow:0 2px 8px rgba(180,50,120,.28);transition:background .12s;
+}
+.stor-knap:active{transform:scale(.97);background:var(--grad-dyb)}
+.stor-knap.graa{background:var(--kort);color:var(--tekst);border:1px solid var(--kant-staerk)}
+.stor-knap.graa:active{background:var(--kort-hover)}
+.stor-knap.roed{background:var(--rod);color:#fff}
+.stor-knap.blaa{background:var(--blaa);color:#fff}
+.stor-knap.lille{min-height:46px;padding:0 16px;font-size:15px}
+.stor-knap.prisknap{min-height:50px;padding:0 18px;font-size:18px;font-weight:800;color:var(--brand)}
+.stor-knap[disabled]{opacity:.45;pointer-events:none}
+
+/* Pant-knap i kurvbjælken */
+.pant-toggle{
+  display:flex;align-items:center;gap:11px;min-height:58px;padding:0 18px;
+  border-radius:11px;background:var(--kort);border:1px solid var(--kant-staerk);
+  color:var(--tekst);flex:0 0 auto;text-align:left;transition:all .12s;
+}
+.pant-toggle .ikon{font-size:22px;line-height:1}
+.pant-toggle .t1{display:block;font-size:15px;font-weight:700}
+.pant-toggle .t2{display:block;font-size:13px;color:var(--tekst-svag);font-weight:600}
+.pant-toggle:active{transform:scale(.97)}
+.pant-toggle.aktiv{background:var(--blaa-blod);border-color:var(--blaa);color:var(--blaa)}
+.pant-toggle.aktiv .t2{color:var(--blaa)}
+
+.kurvliste{
+  position:fixed;left:0;right:0;bottom:82px;z-index:39;max-height:52vh;overflow-y:auto;
+  background:var(--kort);border-top:1px solid var(--kant);padding:6px 20px;
+  box-shadow:0 -4px 16px rgba(24,39,75,.06);
+}
+.kurvlinje{
+  display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--kant);
+}
+.kurvlinje:last-child{border-bottom:none}
+.kurvlinje .navn{flex:1;font-size:17px;font-weight:650;min-width:0}
+.kurvlinje .beloeb{font-size:17px;font-weight:800;min-width:84px;text-align:right}
+.kurvlinje .antal{min-width:38px;text-align:center;font-size:19px;font-weight:800}
+.rundknap{
+  width:48px;height:48px;border-radius:10px;background:var(--kort);
+  border:1px solid var(--kant-staerk);font-size:24px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;color:var(--tekst);
+}
+.rundknap:active{transform:scale(.93);background:var(--kort-hover)}
+
+.pantknap{
+  min-height:44px;padding:0 14px;border-radius:9px;flex:0 0 auto;
+  background:var(--kort);border:1px solid var(--kant-staerk);
+  font-size:14px;font-weight:700;color:var(--tekst-svag);
+}
+.pantknap.aktiv{background:var(--blaa-blod);border-color:var(--blaa);color:var(--blaa)}
+.pantknap:active{transform:scale(.95)}
+.pantknap.usynlig{visibility:hidden}
+
+.minibillede{
+  width:42px;height:42px;border-radius:9px;background-size:cover;background-position:center;
+  background-color:var(--flade);border:1px solid var(--kant);flex:0 0 auto;
+}
+.minibillede.tom{display:flex;align-items:center;justify-content:center;font-size:22px}
+
+/* ---------- Kvittering ---------- */
+.kvittering{
+  position:fixed;inset:0;z-index:60;background:var(--grad);color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:28px;
+  text-align:center;
+}
+.kvittering .flueben{
+  width:96px;height:96px;border-radius:50%;background:rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;font-size:52px;margin-bottom:4px;
+}
+.kvittering h2{font-size:34px;font-weight:800}
+.kvittering .beloeb{font-size:56px;font-weight:900;letter-spacing:-1.5px}
+.kvittering .varer{font-size:18px;opacity:.9;max-width:620px;font-weight:600}
+.kvittering .fortryd{
+  margin-top:14px;min-height:60px;padding:0 32px;border-radius:11px;
+  background:rgba(0,0,0,.22);color:#fff;font-size:18px;font-weight:700;
+  border:1px solid rgba(255,255,255,.3);
+}
+.kvittering .fortryd:active{transform:scale(.97);background:rgba(0,0,0,.28)}
+.kvittering .advarsel{
+  background:rgba(0,0,0,.16);border-radius:9px;padding:9px 15px;font-size:15px;font-weight:600
+}
+
+/* ---------- Dialoger ---------- */
+.overlay{
+  position:fixed;inset:0;z-index:70;background:rgba(27,36,50,.45);
+  display:flex;align-items:center;justify-content:center;padding:18px;
+  backdrop-filter:blur(2px);
+}
+#overlaylag2 .overlay{z-index:85}
+.dialog{
+  width:100%;max-width:520px;max-height:94vh;overflow-y:auto;
+  background:var(--kort);border-radius:16px;padding:24px;
+  box-shadow:0 20px 50px rgba(24,39,75,.25);
+}
+.dialog.bred{max-width:780px}
+.dialog h2{font-size:22px;font-weight:800;margin-bottom:5px;letter-spacing:-.3px}
+.dialog p.hjaelp{color:var(--tekst-svag);font-size:14px;margin-bottom:16px;line-height:1.45}
+.dialog .knapper{display:flex;gap:11px;margin-top:20px}
+.dialog .knapper .stor-knap{flex:1}
+
+.felt{margin-bottom:15px}
+.felt label{display:block;font-size:13px;color:var(--tekst-svag);margin-bottom:6px;
+  font-weight:700;text-transform:uppercase;letter-spacing:.4px}
+.felt input,.felt select,.felt textarea{
+  width:100%;min-height:52px;padding:0 14px;border-radius:10px;
+  background:var(--kort);border:1px solid var(--kant-staerk);font-size:17px;color:var(--tekst);
+}
+.felt input:focus,.felt select:focus{outline:none;border-color:var(--blaa);
+  box-shadow:0 0 0 3px var(--blaa-blod)}
+.felt-raekke{display:flex;gap:11px}
+.felt-raekke .felt{flex:1}
+
+.emoji-vaelger{display:flex;flex-wrap:wrap;gap:7px}
+.emoji-vaelger button{
+  width:48px;height:48px;border-radius:10px;background:var(--kort);
+  border:1px solid var(--kant-staerk);font-size:23px;
+}
+.emoji-vaelger button.valgt{border-color:var(--brand);background:var(--brand-blod);
+  box-shadow:0 0 0 2px rgba(229,64,127,.22)}
+.farveknap{width:48px;height:48px;border-radius:10px;border:2px solid transparent}
+.farveknap.valgt{border-color:var(--tekst);box-shadow:0 0 0 3px rgba(27,36,50,.15)}
+
+.kontakt{display:flex;align-items:center;gap:11px;margin-bottom:13px}
+.kontakt input[type=checkbox]{width:26px;height:26px;accent-color:var(--brand);flex:0 0 auto}
+.kontakt label{font-size:16px;font-weight:600}
+
+/* ---------- Billeder ---------- */
+.billedvaelger{display:flex;gap:14px;align-items:flex-start}
+.forhaandsvisning{
+  width:98px;height:98px;border-radius:12px;background:var(--flade);
+  border:1px dashed var(--kant-staerk);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;flex:0 0 auto;
+  font-size:12px;color:var(--tekst-svag);text-align:center;padding:6px;
+}
+.forhaandsvisning.rund{border-radius:50%}
+.forhaandsvisning img{width:100%;height:100%;object-fit:cover;display:block}
+.billedknapper{flex:1;display:flex;flex-direction:column;gap:9px;min-width:0}
+.billedknapper .stor-knap{min-height:48px;font-size:16px;padding:0 16px}
+.billedknaprad{display:flex;gap:9px}
+.billedknaprad .stor-knap{flex:1}
+
+.kameraboks{
+  position:relative;width:100%;max-width:320px;margin:0 auto 4px;aspect-ratio:1/1;
+  border-radius:14px;overflow:hidden;background:#1b2432;border:1px solid var(--kant);
+}
+.kameraboks.rund{border-radius:50%}
+.kameraboks video,.kameraboks img{width:100%;height:100%;object-fit:cover;display:block}
+.kameraboks video{transform:scaleX(-1)}
+
+/* ---------- Numpad ---------- */
+.numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:5px}
+.numpad button{
+  min-height:62px;border-radius:11px;background:var(--kort);border:1px solid var(--kant-staerk);
+  font-size:25px;font-weight:700;
+}
+.numpad button:active{transform:scale(.95);background:var(--kort-hover)}
+.numdisplay{
+  min-height:70px;border-radius:11px;background:var(--flade);border:1px solid var(--kant);
+  display:flex;align-items:center;justify-content:flex-end;padding:0 18px;
+  font-size:34px;font-weight:800;margin-bottom:11px;
+}
+
+/* ---------- Gruppevælger ---------- */
+.gruppevaelger{display:flex;flex-wrap:wrap;gap:8px}
+.gruppevaelger .chip{min-height:50px}
+
+.varighed{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px}
+.varighed .stor-knap{min-height:60px;font-size:17px}
+
+/* ---------- Administration ---------- */
+.faneblade{
+  display:flex;gap:4px;padding:0 20px;overflow-x:auto;flex:0 0 auto;
+  background:linear-gradient(rgba(20,10,35,.26),rgba(20,10,35,.26)),var(--grad);
+  scrollbar-width:none;
+}
+.faneblade::-webkit-scrollbar{display:none}
+.faneblade button{
+  min-height:48px;padding:0 18px;background:none;border-bottom:3px solid transparent;
+  font-size:15px;font-weight:650;color:rgba(255,255,255,.6);white-space:nowrap;
+}
+.faneblade button.aktiv{color:#fff;border-bottom-color:#fff}
+
+.raekke{
+  display:flex;align-items:center;gap:13px;padding:13px 15px;border-radius:var(--radius);
+  background:var(--kort);border:1px solid var(--kant);margin-bottom:9px;box-shadow:var(--skygge);
+}
+.raekke .emoji{
+  font-size:24px;width:42px;height:42px;flex:0 0 auto;border-radius:9px;background:var(--flade);
+  border:1px solid var(--kant);display:flex;align-items:center;justify-content:center;
+}
+.raekke .midt{flex:1;min-width:0}
+.raekke .titel{font-size:17px;font-weight:700}
+.raekke .under{font-size:14px;color:var(--tekst-svag);margin-top:2px}
+.raekke.inaktiv{opacity:.5}
+.raekke .hoejre{display:flex;align-items:center;gap:9px;flex:0 0 auto}
+.raekke .ikonknap{background:var(--flade);border:1px solid var(--kant);color:var(--tekst);
+  width:46px;height:46px;font-size:18px}
+.raekke .ikonknap:active{background:var(--kort-hover)}
+
+.lagertal{
+  min-width:64px;height:50px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:21px;font-weight:800;background:var(--flade);
+  border:1px solid var(--kant);flex:0 0 auto;
+}
+.lagertal.lav{background:var(--gul-blod);color:var(--gul);border-color:#f5dfba}
+.lagertal.tom{background:var(--rod-blod);color:var(--rod);border-color:#f6c9ca}
+
+.sektion{margin-bottom:26px}
+.sektion h3{
+  font-size:13px;text-transform:uppercase;letter-spacing:.8px;color:var(--tekst-svag);
+  margin-bottom:11px;font-weight:800;
+}
+
+.noegletal{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;margin-bottom:20px}
+.noegletal .kort{
+  background:var(--kort);border:1px solid var(--kant);border-radius:var(--radius);
+  padding:16px;box-shadow:var(--skygge);
+}
+.noegletal .kort .v{font-size:27px;font-weight:800;letter-spacing:-.5px}
+.noegletal .kort .l{font-size:12px;color:var(--tekst-svag);margin-top:3px;
+  text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+.noegletal .kort.advarsel .v{color:var(--gul)}
+.noegletal .kort.fare .v{color:var(--rod)}
+
+.rapportraekke{
+  display:flex;align-items:center;gap:13px;padding:14px 15px;border-radius:var(--radius);
+  background:var(--kort);border:1px solid var(--kant);margin-bottom:9px;box-shadow:var(--skygge);
+}
+.rapportraekke .beloeb{font-size:22px;font-weight:800;color:var(--brand)}
+.detaljer{
+  background:var(--flade);border:1px solid var(--kant);border-top:none;
+  border-radius:0 0 var(--radius) var(--radius);margin:-13px 0 9px;padding:4px 16px 12px;
+}
+.detaljelinje{display:flex;gap:11px;padding:9px 0;border-bottom:1px solid var(--kant);font-size:15px}
+.detaljelinje:last-child{border-bottom:none}
+.detaljelinje .n{flex:1;min-width:0}
+.detaljelinje .a{color:var(--tekst-svag);min-width:64px}
+.detaljelinje .b{font-weight:700;min-width:80px;text-align:right}
+.detaljelinje.pantlinje{color:var(--blaa)}
+.detaljelinje.pantlinje .a{color:var(--blaa);opacity:.75}
+
+.knaprad{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+.knaprad .stor-knap{flex:1;min-width:180px;font-size:16px;min-height:54px;padding:0 18px}
+
+.maerkat{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;
+  font-size:12px;font-weight:700;background:var(--flade);color:var(--tekst-svag);
+  border:1px solid var(--kant);
+}
+.maerkat.gron{background:var(--brand-blod);color:var(--brand-dyb);border-color:#f6c4d8}
+.maerkat.gul{background:var(--gul-blod);color:var(--gul);border-color:#f5dfba}
+.maerkat.rod{background:var(--rod-blod);color:var(--rod);border-color:#f6c9ca}
+
+/* ---------- Prestilstande ---------- */
+.tilstandstribe{
+  display:flex;align-items:center;gap:9px;padding:10px 20px;flex:0 0 auto;
+  font-size:15px;font-weight:600;color:#fff;
+}
+.tilstandstribe .emoji{font-size:19px;line-height:1}
+.tilstandstribe strong{font-weight:800}
+
+.produkttile .pris.aendret{display:flex;align-items:baseline;gap:7px;justify-content:center}
+.produkttile .pris.aendret s{font-size:14px;font-weight:600;color:var(--tekst-svag)}
+
+.tilstandstatus{
+  display:flex;align-items:center;gap:15px;padding:18px;margin-bottom:18px;
+  border-radius:14px;background:var(--kort);border:2px solid var(--kant);box-shadow:var(--skygge);
+}
+.tilstandstatus .stort-emoji{font-size:40px;line-height:1;flex:0 0 auto}
+.tilstandstatus .midt{flex:1;min-width:0}
+.tilstandstatus .titel{font-size:21px;font-weight:800}
+.tilstandstatus .under{font-size:15px;color:var(--tekst-svag);margin-top:3px}
+
+/* ---------- Hestevæddeløb ---------- */
+/* Fylder hele skærmen – ingen kioskbaggrund skal kunne ses bagved. */
+.spil{
+  position:fixed;inset:0;z-index:75;background:var(--grad);color:#fff;
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+.spil.slap{background:linear-gradient(140deg,#17a34a 0%,#0b8b4a 100%)}
+.spil.ordning{background:linear-gradient(140deg,#8b3fd6 0%,#e5407f 52%,#ff8a3d 100%)}
+
+.spilkort{
+  position:relative;z-index:2;width:100%;height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:10px;padding:28px 34px;overflow-y:auto;text-align:center;
+}
+.spilhat{
+  font-size:19px;font-weight:800;letter-spacing:4px;text-transform:uppercase;
+  color:rgba(255,255,255,.8);
+}
+.spilkort h2{font-size:46px;font-weight:800;letter-spacing:-.8px;line-height:1.1}
+.spilkort h2.raab{font-size:clamp(56px,11vw,110px);letter-spacing:2px}
+.spiltekst{
+  font-size:23px;color:rgba(255,255,255,.9);line-height:1.4;
+  max-width:760px;margin-bottom:6px;
+}
+.spiltekst strong{color:#fff}
+.spilkort .kaempe{font-size:clamp(80px,15vh,140px);line-height:1}
+.spilkort .hvem{
+  font-size:30px;font-weight:800;background:rgba(0,0,0,.22);color:#fff;
+  border:1px solid rgba(255,255,255,.3);border-radius:16px;padding:18px 30px;
+}
+.spilkort .stor-knap{
+  width:100%;max-width:420px;margin-top:12px;min-height:70px;font-size:22px;
+  background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.35);
+}
+.spilkort .stor-knap:active{background:rgba(0,0,0,.34)}
+
+/* Vælg hest */
+.hestevalg{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;
+  width:100%;max-width:1000px;margin-top:8px;
+}
+.hestkort{
+  display:flex;flex-direction:column;align-items:center;gap:7px;padding:22px 12px;
+  border-radius:18px;background:#fff;border:3px solid transparent;color:var(--tekst);
+  box-shadow:0 8px 22px rgba(30,10,50,.22);
+}
+.hestkort:active{transform:scale(.94);border-color:var(--f)}
+.hestkort .nr{
+  width:40px;height:40px;border-radius:50%;background:var(--f);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;
+}
+.hestkort .dyr{width:100%;max-width:120px;display:block}
+.hestkort .hnavn{font-size:18px;font-weight:750;line-height:1.15}
+
+/* Alarmskærm: blinker grønt og rødt så hele rummet ser det.
+   Blinket skifter 2,5 gange i sekundet — bevidst under grænsen på 3 blink
+   pr. sekund, som er der hvor fuldskærmsblink begynder at være risikabelt. */
+.alarm{
+  position:fixed;inset:0;z-index:80;
+  display:flex;align-items:center;justify-content:center;text-align:center;
+  animation:alarmblink .8s steps(1,end) infinite;
+}
+@keyframes alarmblink{
+  0%,49.9%  {background:#d61f3c}
+  50%,100%  {background:#12a150}
+}
+.alarmindhold{
+  display:flex;flex-direction:column;align-items:center;gap:6px;padding:24px;
+  animation:alarmpuls .8s steps(1,end) infinite;
+}
+@keyframes alarmpuls{
+  0%,49.9%{transform:scale(1)}
+  50%,100%{transform:scale(1.06)}
+}
+.alarmikon{font-size:clamp(70px,13vh,120px);line-height:1}
+.alarmraab{
+  font-size:clamp(48px,10vw,104px);font-weight:900;color:#fff;line-height:1;
+  letter-spacing:-1px;text-shadow:0 6px 18px rgba(0,0,0,.35);
+}
+.alarmtitel{
+  font-size:clamp(26px,5.4vw,58px);font-weight:900;color:#fff;letter-spacing:6px;
+  text-shadow:0 4px 12px rgba(0,0,0,.3);
+}
+.alarmnavn{
+  margin-top:12px;font-size:clamp(17px,2.4vw,26px);font-weight:700;color:#fff;
+  background:rgba(0,0,0,.28);border:1px solid rgba(255,255,255,.35);
+  border-radius:12px;padding:10px 24px;
+}
+
+/* Selve løbet: én sammenhængende bane over hele skærmen, delt af hvide hegn */
+.banen{
+  position:absolute;inset:0;z-index:1;overflow:hidden;
+  --rul:0px; --rul2:0px;
+  display:flex;flex-direction:column;
+  background-color:#d4c197;
+  background-image:
+    repeating-linear-gradient(90deg,rgba(120,90,50,.17) 0 3px,transparent 3px 54px),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.16) 0 2px,transparent 2px 160px),
+    linear-gradient(rgba(0,0,0,.10),rgba(0,0,0,0) 22%,rgba(0,0,0,0) 78%,rgba(0,0,0,.12));
+  background-position:var(--rul) 0,var(--rul) 0,0 0;
+  background-repeat:repeat,repeat,no-repeat;
+}
+
+.lane{position:relative;flex:1;min-height:0}
+
+/* Hegnet mellem banerne: to lister og stolper der løber forbi */
+.lane::before,
+.banen::after{
+  content:'';position:absolute;left:0;right:0;height:26px;z-index:2;pointer-events:none;
+  background-image:
+    linear-gradient(#fff,#dfe5ee),
+    linear-gradient(#fff,#dfe5ee),
+    repeating-linear-gradient(90deg,
+      #fff 0 11px,rgba(178,189,206,.95) 11px 14px,transparent 14px 104px);
+  background-size:100% 6px,100% 5px,104px 100%;
+  background-position:0 0,0 21px,var(--rul2) 0;
+  background-repeat:no-repeat,no-repeat,repeat-x;
+  filter:drop-shadow(0 3px 4px rgba(0,0,0,.38));
+}
+.lane::before{top:0}
+.banen::after{bottom:0}
+
+.lane.min{background:rgba(255,255,255,.14)}
+
+/* Efter målstregen: vinderen fremhæves, resten falder tilbage */
+.lane{transition:background .5s,filter .5s}
+.lane.vinder{background:rgba(255,214,102,.26)}
+.lane.vinder .loeber{filter:drop-shadow(0 0 16px rgba(255,205,60,.95))}
+.lane.taber{filter:saturate(.35) brightness(.72)}
+.lanemaerke .sejr{
+  font-style:normal;font-size:11px;font-weight:800;letter-spacing:1.2px;
+  background:linear-gradient(#ffd76a,#f0a92a);color:#3a2600;
+  border-radius:5px;padding:2px 8px;margin-left:2px;
+}
+.loebhud .afstand.vandt{
+  background:linear-gradient(#ffd76a,#f0a92a);color:#3a2600;
+  font-size:20px;box-shadow:0 3px 14px rgba(240,169,42,.5);
+}
+
+.lanemaerke{
+  position:absolute;left:12px;top:32px;z-index:4;display:flex;align-items:center;gap:8px;
+  background:rgba(28,20,12,.5);backdrop-filter:blur(3px);
+  border-radius:999px;padding:4px 13px 4px 4px;
+  color:#fff;font-size:15px;font-weight:750;white-space:nowrap;
+}
+.lanemaerke b{
+  width:24px;height:24px;border-radius:50%;color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
+}
+.lanemaerke em{
+  font-style:normal;font-size:10px;font-weight:800;letter-spacing:1.4px;
+  background:var(--brand);border-radius:5px;padding:2px 7px;margin-left:2px;
+}
+
+/* Hesten fylder det meste af sin bane */
+.lane .loeber{
+  position:absolute;left:0;bottom:7%;height:82%;z-index:3;
+  transform:translateX(-50%);
+  transition:left .1s linear,opacity .2s;
+  animation:hestbob .44s steps(2,end) infinite;
+}
+.lane .loeber .fotohest,.lane .loeber .hestsvg{height:100%;width:auto}
+
+.banen .maal{
+  position:absolute;left:100%;top:0;bottom:0;width:14px;z-index:5;
+  background:repeating-linear-gradient(180deg,#1b2432 0 10px,#fff 10px 20px);
+  box-shadow:0 0 0 2px rgba(0,0,0,.3);
+}
+.banen .maal span{
+  position:absolute;left:20px;top:50%;transform:translateY(-50%);
+  font-size:14px;font-weight:800;letter-spacing:2px;color:#1b2432;
+  background:rgba(255,255,255,.9);padding:4px 10px;border-radius:6px;
+}
+
+/* Overlejret hoved, så banen får hele fladen */
+.loebhud{
+  position:absolute;left:0;right:0;top:0;z-index:6;pointer-events:none;
+  display:flex;align-items:center;justify-content:center;gap:16px;padding:7px 16px;
+  background:linear-gradient(rgba(20,12,4,.6),rgba(20,12,4,0));
+}
+.loebhud .spilhat{color:rgba(255,255,255,.9);font-size:14px;letter-spacing:3px;margin:0}
+.loebhud .afstand{
+  font-size:17px;font-weight:800;letter-spacing:1.5px;color:#fff;
+  background:rgba(0,0,0,.45);border-radius:8px;padding:4px 16px;
+}
+/* Oversigten ligger nederst, så den ikke dækker første bane */
+.loebhud .oversigt{
+  position:fixed;left:0;right:0;bottom:10px;width:auto;
+  padding:0 18px;max-width:none;
+}
+
+/* Galop i klip: kun én benstilling er synlig ad gangen */
+.hestsvg{height:100%;width:auto;display:block;overflow:visible}
+.hestsvg .ben{opacity:0;animation:galopklip .44s steps(1,end) infinite}
+.hestsvg .ben.b1{animation-delay:0s}
+.hestsvg .ben.b2{animation-delay:.11s}
+.hestsvg .ben.b3{animation-delay:.22s}
+.hestsvg .ben.b4{animation-delay:.33s}
+@keyframes galopklip{0%,24.9%{opacity:1}25%,100%{opacity:0}}
+@keyframes hestbob{
+  0%  {transform:translateX(-50%) translateY(0)}
+  50% {transform:translateX(-50%) translateY(-6%)}
+}
+
+.hestsvg polyline{fill:none;stroke:#6b4423;stroke-width:5.5;
+  stroke-linecap:round;stroke-linejoin:round}
+.hestsvg .fjern polyline{stroke:#4a2d15}
+.hestsvg .pels{fill:#8a5a2b}
+.hestsvg .man{fill:#3a2411}
+.hestsvg .oeje{fill:#1b1208}
+.hestsvg .hjelm{fill:#fff;stroke:#d5d9e0;stroke-width:1}
+.hestsvg .skygge{fill:#41506b}
+.hestsvg .arm{fill:none;stroke-width:5;stroke-linecap:round}
+.hestsvg .stovle{fill:none;stroke:#1b2432;stroke-width:5;stroke-linecap:round}
+.hestsvg .tojle{fill:none;stroke:#5a3a1c;stroke-width:1.6}
+.hestsvg .nummer{font:800 9px -apple-system,sans-serif;fill:#fff;text-anchor:middle}
+
+/* Oversigtsstribe */
+.ovbane{
+  position:relative;height:9px;border-radius:5px;background:rgba(0,0,0,.35);
+  border:1px solid rgba(255,255,255,.4);
+}
+.ovprik{
+  position:absolute;top:50%;left:0;width:13px;height:13px;border-radius:50%;
+  transform:translate(-50%,-50%);border:2px solid rgba(255,255,255,.9);
+  transition:left .1s linear;
+}
+.ovmaal{
+  position:absolute;right:-1px;top:-4px;bottom:-4px;width:4px;border-radius:2px;
+  background:repeating-linear-gradient(180deg,#1b2432 0 4px,#fff 4px 8px);
+}
+
+/* Fotoklip i stedet for den tegnede hest */
+.fotohest{position:relative;line-height:0}
+.fotohest .klip{width:100%;height:auto;display:block}
+.fotohest .klip:not(:first-child){
+  position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;
+}
+.lane .fotohest .klip{width:auto;height:100%}
+.lane .fotohest .klip:not(:first-child){width:100%;height:100%}
+/* Ét enkelt foto: hakkende galop i faste spring i stedet for glidende bevægelse */
+.fotohest.enkelt{animation:hakgalop .44s steps(1,end) infinite;transform-origin:60% 90%}
+@keyframes hakgalop{
+  0%  {transform:translateY(0)    rotate(0deg)}
+  25% {transform:translateY(-5px) rotate(-2.5deg)}
+  50% {transform:translateY(-1px) rotate(.5deg)}
+  75% {transform:translateY(-6px) rotate(1.5deg)}
+}
+.loeber:has(.fotohest){animation:none}
+
+.klipraekke{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.klipmini{
+  position:relative;width:82px;height:60px;border-radius:9px;overflow:hidden;
+  background:var(--flade);border:1px solid var(--kant-staerk);flex:0 0 auto;
+}
+.klipmini img{width:100%;height:100%;object-fit:cover;display:block}
+.klipmini .kliptal{
+  position:absolute;left:4px;top:4px;background:rgba(0,0,0,.6);color:#fff;
+  font-size:11px;font-weight:800;border-radius:5px;padding:1px 6px;
+}
+.klipslet{
+  position:absolute;right:3px;top:3px;width:22px;height:22px;border-radius:50%;
+  background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.klipslet:active{background:var(--rod)}
+.klipadd{
+  width:82px;height:60px;border-radius:9px;flex:0 0 auto;
+  background:var(--flade);border:1px dashed var(--kant-staerk);color:var(--tekst-svag);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;line-height:1;gap:2px;
+}
+.klipadd span{font-size:11px;font-weight:700}
+.klipadd:active{background:var(--kort-hover)}
+
+/* Afstand og oversigtsstribe */
+.afstand{
+  font-size:17px;font-weight:800;letter-spacing:1.5px;color:#fff;
+  background:rgba(0,0,0,.22);border-radius:9px;padding:6px 16px;
+}
+.oversigt{width:100%;max-width:1060px;padding:0 4px}
+.ovbane{
+  position:relative;height:10px;border-radius:5px;background:rgba(255,255,255,.25);
+  border:1px solid rgba(255,255,255,.3);
+}
+.ovprik{
+  position:absolute;top:50%;left:0;width:12px;height:12px;border-radius:50%;
+  transform:translate(-50%,-50%);border:2px solid rgba(255,255,255,.85);
+  transition:left .1s linear;
+}
+.ovmaal{
+  position:absolute;right:-1px;top:-3px;bottom:-3px;width:4px;border-radius:2px;
+  background:repeating-linear-gradient(180deg,#1b2432 0 4px,#fff 4px 8px);
+}
+
+.konfetti{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+
+@media (max-height:680px){
+  .spilkort h2{font-size:34px}
+  .spilkort .kaempe{font-size:70px}
+  .spiltekst{font-size:19px}
+  .hestkort{padding:14px 10px}
+  .baneinfo .hnavn{font-size:15px}
+  .afstand{font-size:14px}
+}
+
+/* ---------- Årsshow ---------- */
+.show{
+  position:fixed;inset:0;z-index:82;background:var(--grad);color:#fff;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:30px 24px 96px;text-align:center;cursor:pointer;overflow:hidden;
+}
+.showkort{display:flex;flex-direction:column;align-items:center;gap:10px;max-width:960px;width:100%}
+.showikon{font-size:clamp(56px,11vh,110px);line-height:1}
+.showhat{
+  font-size:clamp(13px,1.8vw,19px);font-weight:800;letter-spacing:5px;
+  color:rgba(255,255,255,.8);text-transform:uppercase;
+}
+.showstor{
+  font-size:clamp(40px,8vw,92px);font-weight:900;line-height:1.05;letter-spacing:-1.5px;
+  text-shadow:0 6px 20px rgba(0,0,0,.3);word-break:break-word;
+}
+.showunder{font-size:clamp(17px,2.4vw,28px);font-weight:600;color:rgba(255,255,255,.94)}
+.showekstra{
+  font-size:clamp(14px,1.7vw,19px);color:rgba(255,255,255,.8);
+  background:rgba(0,0,0,.2);border-radius:10px;padding:8px 18px;margin-top:4px;
+}
+.showliste{
+  margin-top:10px;display:flex;flex-direction:column;gap:7px;
+  font-size:clamp(15px,2vw,22px);font-weight:650;color:rgba(255,255,255,.92);
+}
+
+.soejler{
+  display:flex;align-items:flex-end;gap:6px;height:clamp(120px,26vh,240px);
+  margin:14px 0 6px;width:100%;max-width:760px;
+}
+.soejle{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
+.soejle .stang{
+  width:100%;border-radius:5px 5px 0 0;background:rgba(255,255,255,.9);
+  box-shadow:0 2px 8px rgba(0,0,0,.2);
+}
+.soejle span{font-size:12px;font-weight:700;color:rgba(255,255,255,.8);margin-top:6px}
+
+.showbund{
+  position:absolute;left:0;right:0;bottom:22px;display:flex;align-items:center;
+  justify-content:center;gap:20px;
+}
+.showknap{
+  width:52px;height:52px;border-radius:50%;background:rgba(0,0,0,.25);color:#fff;
+  border:1px solid rgba(255,255,255,.3);font-size:26px;line-height:1;
+  display:flex;align-items:center;justify-content:center;
+}
+.showknap:active{background:rgba(0,0,0,.4)}
+.showprikker{display:flex;gap:7px;flex-wrap:wrap;justify-content:center;max-width:60vw}
+.showprikker span{
+  width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.4);
+}
+.showprikker span.nu{background:#fff;transform:scale(1.3)}
+.showluk{
+  position:absolute;right:18px;top:18px;width:46px;height:46px;border-radius:50%;
+  background:rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:19px;
+}
+
+/* ---------- Knapstørrelse ---------- */
+.skalavaelger{display:flex;flex-wrap:wrap;gap:9px}
+.skalavaelger .chip{min-height:56px}
+.skalaeksempel{
+  margin-top:12px;padding:14px;border-radius:12px;
+  background:var(--flade);border:1px solid var(--kant);
+}
+.skalaeksempel .grid{margin:0}
+
+/* ---------- Adresser ---------- */
+.adresser{margin-top:4px}
+.adresse{
+  background:var(--flade);border:1px solid var(--kant);border-radius:11px;
+  padding:12px 14px;margin-bottom:9px;
+}
+.adresse .l{
+  font-size:12px;font-weight:700;color:var(--tekst-svag);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;
+}
+.adresse a{
+  font-size:14px;color:var(--blaa);word-break:break-all;font-weight:600;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+
+/* ---------- Sletning ---------- */
+.sletliste{display:flex;flex-direction:column;gap:9px;margin-bottom:16px}
+.sletlinje{
+  border-radius:11px;padding:11px 14px;border:1px solid var(--kant);background:var(--flade);
+}
+.sletlinje b{display:block;font-size:15px;font-weight:750;margin-bottom:2px}
+.sletlinje span{display:block;font-size:13.5px;color:var(--tekst-svag);line-height:1.4}
+.sletlinje.beholdes{background:var(--brand-blod);border-color:#f6c4d8}
+.sletlinje.beholdes b{color:var(--brand-dyb)}
+.sletlinje.advarsel{background:var(--gul-blod);border-color:#f5dfba}
+.sletlinje.advarsel b{color:var(--gul)}
+
+/* ---------- Min side ---------- */
+.minside-top{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+.minside-top .avatar{width:88px;height:88px;font-size:30px}
+.minside-top .midt{flex:1;min-width:0}
+.minside-top .navn{font-size:24px;font-weight:800}
+.minside-top .under{font-size:15px;color:var(--tekst-svag);margin-top:3px}
+
+.minside-sum{
+  display:flex;gap:12px;margin-bottom:16px;
+}
+.minside-sum .kort{
+  flex:1;background:var(--flade);border:1px solid var(--kant);border-radius:12px;padding:14px;
+}
+.minside-sum .v{font-size:24px;font-weight:800}
+.minside-sum .l{font-size:12px;color:var(--tekst-svag);text-transform:uppercase;
+  letter-spacing:.5px;font-weight:700;margin-top:2px}
+
+.kunlaes{
+  display:flex;align-items:center;gap:8px;font-size:13px;color:var(--tekst-svag);
+  background:var(--flade);border:1px solid var(--kant);border-radius:9px;
+  padding:9px 13px;margin-bottom:14px;font-weight:600;
+}
+
+/* ---------- Statusstriber ---------- */
+.stribe{
+  display:flex;align-items:center;gap:9px;padding:10px 20px;font-size:14px;font-weight:650;
+  flex:0 0 auto;
+}
+.stribe.gul{background:var(--gul-blod);color:var(--gul);border-bottom:1px solid #f5dfba}
+.stribe.rod{background:var(--rod-blod);color:var(--rod);border-bottom:1px solid #f6c9ca}
+.stribe.blaa{background:var(--blaa-blod);color:var(--blaa);border-bottom:1px solid #c8dcfb}
+
+.tom-besked{text-align:center;color:var(--tekst-svag);padding:52px 20px;font-size:17px}
+.tom-besked .stor{font-size:46px;margin-bottom:12px}
+
+.csvfelt{
+  width:100%;height:300px;background:var(--flade);color:var(--tekst);
+  border:1px solid var(--kant-staerk);border-radius:10px;padding:12px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;
+}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed;left:50%;bottom:100px;transform:translateX(-50%);z-index:90;
+  background:#2b1b3d;color:#fff;border-radius:11px;
+  padding:14px 22px;font-size:16px;font-weight:600;max-width:88vw;text-align:center;
+  box-shadow:0 8px 24px rgba(40,20,60,.3);opacity:0;pointer-events:none;transition:opacity .18s;
+}
+#toast.vis{opacity:1}
+#toast.fejl{background:var(--rod)}
+
+/* ---------- Indlæsning ---------- */
+#loader{
+  position:fixed;inset:0;z-index:100;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+  color:var(--tekst);
+}
+.spinner{
+  width:48px;height:48px;border-radius:50%;
+  border:4px solid var(--kant-staerk);border-top-color:var(--brand);
+  animation:snurr .8s linear infinite;
+}
+@keyframes snurr{to{transform:rotate(360deg)}}
+.skjul{display:none !important}
+
+@media (max-width:900px){
+  .grid-personer{grid-template-columns:repeat(auto-fill,minmax(136px,1fr))}
+  .grid-produkter{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+  .top h1{font-size:19px}
+  .pant-toggle .t1{font-size:14px}
+}
+</style>
+
+</head>
+<body>
+  <div id="app"></div>
+  <div id="overlaylag"></div>
+  <div id="overlaylag2"></div>
+  <div id="toast"></div>
+
+  <div id="loader">
+    <div class="spinner"></div>
+    <div style="font-size:20px;font-weight:600">Henter køleskabet…</div>
+  </div>
+
+  <script src="config.js"></script>
+  <script>
 /* ================================================================== *
  * Køleskabet – klient                                                *
  * ================================================================== */
@@ -3883,3 +4879,6 @@ setInterval(function () {
 
 start();
 </script>
+
+</body>
+</html>

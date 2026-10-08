@@ -72,6 +72,38 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+/**
+ * API til den selvstændige udgave af kiosken (docs/), som ligger uden for
+ * Googles ramme og derfor kan bruge kameraet. Body er tekst-JSON:
+ * {"fn": "navn", "args": [...]}. Kun de funktioner på listen kan kaldes –
+ * de samme som google.script.run kan nå, og de tjekker selv PIN-koden.
+ */
+const API_FUNKTIONER_ = ['hentStartdata', 'hentProdukter', 'hentSpil', 'hentTilstande',
+  'gemTilstand', 'sletTilstand', 'aktiverTilstand', 'deaktiverTilstande', 'registrerKoeb',
+  'fortrydKoeb', 'paafyldLager', 'optaelLager', 'registrerSpild', 'justerLager',
+  'bulkPaafyld', 'hentLagerstatus', 'hentLagerlog', 'tjekPin', 'gemProdukt',
+  'hentProduktBrug', 'sletProdukt', 'gemPerson', 'hentAdresser', 'saetIndstilling',
+  'hentBilleder', 'hentBilledStempel', 'gemBillede', 'sletBillede', 'opretGaest',
+  'gemEgetBillede', 'sletEgetBillede', 'hentEgneKoeb', 'registrerSpil', 'hentAar',
+  'hentAarsstatistik', 'eksporterAarTilFane', 'hentMaaneder', 'hentRapport',
+  'saetAfregnet', 'hentCsv', 'eksporterTilFane'];
+
+function doPost(e) {
+  var svar;
+  try {
+    var b = JSON.parse(e.postData.contents);
+    if (API_FUNKTIONER_.indexOf(b.fn) === -1) throw new Error('Ukendt funktion.');
+    ensureSheets_();
+    var f = this[b.fn];
+    var data = f.apply(null, b.args || []);
+    svar = { ok: true, data: data === undefined ? null : data };
+  } catch (err) {
+    svar = { ok: false, fejl: String(err && err.message ? err.message : err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(svar))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
 function include(filnavn) {
   return HtmlService.createHtmlOutputFromFile(filnavn).getContent();
 }
@@ -81,6 +113,8 @@ function onOpen() {
     .createMenu('Køleskabet')
     .addItem('Opret/reparer faner', 'reparerFaner')
     .addItem('Vis kiosk-URL', 'visUrl_')
+    .addSeparator()
+    .addItem('Ryd testdata (start forfra)', 'rydTestdata')
     .addToUi();
 }
 
@@ -171,6 +205,27 @@ function ensureSheets_(tving) {
 
   props.setProperty('SkemaVersion', SKEMA_VERSION);
   return 'OK';
+}
+
+/**
+ * Sletter alle personer, køb, spil, lagerbevægelser, billeder og afregninger,
+ * så køleskabet kan tages i brug uden testkonti. Overskrifter, varer, priser,
+ * tilstande og indstillinger (inkl. PIN) bevares. Kan ikke fortrydes.
+ */
+function rydTestdata() {
+  var ui = SpreadsheetApp.getUi();
+  var svar = ui.alert('Ryd testdata',
+    'Alle personer, køb, løbsresultater, lagerbevægelser, billeder og afregninger slettes ' +
+    'for altid. Varer, priser og indstillinger bevares.\n\nFortsæt?',
+    ui.ButtonSet.YES_NO);
+  if (svar !== ui.Button.YES) return;
+  [SHEET_PERSONER, SHEET_KOEB, SHEET_SPIL, SHEET_LAGER, SHEET_BILLEDER, SHEET_AFREGNING]
+    .forEach(function (navn) {
+      var sh = getSheet_(navn);
+      if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
+    });
+  ui.alert('Færdig', 'Testdata er ryddet. Tilføj personer i kiosken under ⚙️ → Personer.',
+    ui.ButtonSet.OK);
 }
 
 /** Menupunktet skal altid køre det hele igennem. */
