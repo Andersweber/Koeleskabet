@@ -129,12 +129,23 @@ function visUrl_() {
 /* Ark-hjælpere                                                        */
 /* ------------------------------------------------------------------ */
 
+var ssCache_ = null;
+var arkCache_ = {};
+
 function getSs_() {
+  if (ssCache_) return ssCache_;
   var id = PropertiesService.getScriptProperties().getProperty('SPREADSHEET_ID');
-  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActive();
+  ssCache_ = id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActive();
+  return ssCache_;
 }
 
-function getSheet_(navn) {
+/**
+ * @param {boolean=} reparer Tjek også at alle kolonner findes. Kun nødvendigt
+ *   ved opsætning (ensureSheets_) – det er et ekstra opslag i arket, så det
+ *   springes over ved almindelige kald.
+ */
+function getSheet_(navn, reparer) {
+  if (!reparer && arkCache_[navn]) return arkCache_[navn];
   var ss = getSs_();
   var sh = ss.getSheetByName(navn);
   if (!sh) {
@@ -142,7 +153,7 @@ function getSheet_(navn) {
     sh.appendRow(HEADERS[navn]);
     sh.setFrozenRows(1);
     sh.getRange(1, 1, 1, HEADERS[navn].length).setFontWeight('bold');
-  } else {
+  } else if (reparer) {
     // Tilføj kolonner der er kommet til i en nyere version
     var bredde = sh.getLastColumn();
     var nuvaerende = bredde ? sh.getRange(1, 1, 1, bredde).getValues()[0] : [];
@@ -153,6 +164,7 @@ function getSheet_(navn) {
         .setValues([mangler]).setFontWeight('bold');
     }
   }
+  arkCache_[navn] = sh;
   return sh;
 }
 
@@ -167,7 +179,7 @@ function ensureSheets_(tving) {
 
   var ss = getSs_();
   [SHEET_PERSONER, SHEET_PRODUKTER, SHEET_KOEB, SHEET_LAGER, SHEET_SPIL, SHEET_TILSTANDE,
-   SHEET_BILLEDER, SHEET_AFREGNING, SHEET_INDSTILLINGER].forEach(function (n) { getSheet_(n); });
+   SHEET_BILLEDER, SHEET_AFREGNING, SHEET_INDSTILLINGER].forEach(function (n) { getSheet_(n, true); });
 
   var ind = getSheet_(SHEET_INDSTILLINGER);
   var kendte = ind.getLastRow() > 1
@@ -203,6 +215,7 @@ function ensureSheets_(tving) {
   var koeb = getSheet_(SHEET_KOEB);
   koeb.getRange(2, 9, Math.max(koeb.getMaxRows() - 1, 1), 2).setNumberFormat('0.00');
 
+  glemIndstillinger_();
   props.setProperty('SkemaVersion', SKEMA_VERSION);
   return 'OK';
 }
@@ -267,12 +280,32 @@ function nytId_(praefiks, eksisterende) {
   return praefiks + (maks + 1);
 }
 
+var INDST_CACHE_NOEGLE_ = 'indstillinger_v1';
+var indstMem_ = null;
+
+/** Alle indstillinger som {nøgle: værdi}. Gemmes 5 min i CacheService, så PIN-tjek
+ *  og de fleste kald ikke skal åbne regnearket. Rettes i arket i hånden, kan det
+ *  tage op til 5 minutter før ændringen slår igennem. */
+function indstillinger_() {
+  if (indstMem_) return indstMem_;
+  var cache = CacheService.getScriptCache();
+  var gemt = cache.get(INDST_CACHE_NOEGLE_);
+  if (gemt) { indstMem_ = JSON.parse(gemt); return indstMem_; }
+  var m = {};
+  readObjects_(SHEET_INDSTILLINGER).forEach(function (r) { m[String(r['Nøgle'])] = String(r['Værdi']); });
+  try { cache.put(INDST_CACHE_NOEGLE_, JSON.stringify(m), 300); } catch (e) {}
+  indstMem_ = m;
+  return m;
+}
+
+function glemIndstillinger_() {
+  indstMem_ = null;
+  try { CacheService.getScriptCache().remove(INDST_CACHE_NOEGLE_); } catch (e) {}
+}
+
 function hentIndstilling_(noegle) {
-  var rk = readObjects_(SHEET_INDSTILLINGER);
-  for (var i = 0; i < rk.length; i++) {
-    if (String(rk[i]['Nøgle']) === noegle) return String(rk[i]['Værdi']);
-  }
-  return '';
+  var m = indstillinger_();
+  return Object.prototype.hasOwnProperty.call(m, noegle) ? m[noegle] : '';
 }
 
 function tz_() { return getSs_().getSpreadsheetTimeZone() || Session.getScriptTimeZone(); }
@@ -836,9 +869,20 @@ function hentLagerstatus() {
 
 /** De seneste lagerbevægelser (påfyld, optælling, spild). */
 function hentLagerlog(antal) {
-  var alle = readObjects_(SHEET_LAGER);
   var n = antal || 50;
-  return alle.slice(Math.max(0, alle.length - n)).reverse().map(function (r) {
+  var sh = getSheet_(SHEET_LAGER);
+  var sidste = sh.getLastRow();
+  if (sidste < 2) return [];
+  var bredde = Math.max(sh.getLastColumn(), HEADERS[SHEET_LAGER].length);
+  var start = Math.max(2, sidste - n + 1);
+  var headers = sh.getRange(1, 1, 1, bredde).getValues()[0];
+  var vaerdier = sh.getRange(start, 1, sidste - start + 1, bredde).getValues();
+  var alle = vaerdier.map(function (v) {
+    var o = {};
+    for (var j = 0; j < headers.length; j++) if (headers[j]) o[headers[j]] = v[j];
+    return o;
+  });
+  return alle.reverse().map(function (r) {
     return {
       id: String(r.ID),
       tid: r.Tidspunkt instanceof Date
@@ -1015,10 +1059,12 @@ function saetIndstillingUdenPin_(noegle, vaerdi) {
   for (var i = 0; i < alle.length; i++) {
     if (String(alle[i]['Nøgle']) === String(noegle)) {
       sh.getRange(alle[i]._row, 2).setValue(vaerdi);
+      glemIndstillinger_();
       return;
     }
   }
   sh.appendRow([noegle, vaerdi]);
+  glemIndstillinger_();
 }
 
 function gemPerson(pin, p) {
@@ -1068,10 +1114,12 @@ function saetIndstilling(pin, noegle, vaerdi) {
   for (var i = 0; i < alle.length; i++) {
     if (String(alle[i]['Nøgle']) === String(noegle)) {
       sh.getRange(alle[i]._row, 2).setValue(vaerdi);
+      glemIndstillinger_();
       return true;
     }
   }
   sh.appendRow([noegle, vaerdi]);
+  glemIndstillinger_();
   return true;
 }
 

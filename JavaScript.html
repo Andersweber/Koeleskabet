@@ -2001,6 +2001,7 @@ function bekraeft(titel, tekst, knaptekst, farve) {
 function bedOmPin() {
   return new Promise(function (res) {
     var kode = '';
+    var tjekker = false;
     function tegn() {
       var prikker = '';
       for (var i = 0; i < 4; i++) {
@@ -2008,7 +2009,7 @@ function bedOmPin() {
           'margin:0 7px;background:' + (i < kode.length ? 'var(--gron)' : 'var(--kant)') + '"></span>';
       }
       var h = '<div class="overlay"><div class="dialog" style="max-width:420px">';
-      h += '<h2>Administration</h2><p class="hjaelp">Indtast PIN-kode</p>';
+      h += '<h2>Administration</h2><p class="hjaelp">' + (tjekker ? 'Tjekker koden…' : 'Indtast PIN-kode') + '</p>';
       h += '<div class="numdisplay" style="justify-content:center">' + prikker + '</div>';
       h += '<div class="numpad">';
       [1, 2, 3, 4, 5, 6, 7, 8, 9].forEach(function (n) { h += '<button data-pin="' + n + '">' + n + '</button>'; });
@@ -2019,16 +2020,20 @@ function bedOmPin() {
       $('overlaylag').querySelectorAll('[data-pin]').forEach(function (b) {
         b.onclick = function () {
           var v = b.getAttribute('data-pin');
+          if (tjekker) return;
           if (v === 'annuller') { lukDialog(); res(null); return; }
           if (v === 'slet') { kode = kode.slice(0, -1); tegn(); return; }
           kode += v;
           tegn();
           if (kode.length >= 4) {
             var forsoeg = kode;
+            tjekker = true;
+            tegn();
             kald('tjekPin', forsoeg).then(function (ok) {
+              tjekker = false;
               if (ok) { lukDialog(); res(forsoeg); }
               else { kode = ''; toast('Forkert PIN-kode', true); tegn(); }
-            }).catch(function () { kode = ''; toast('Ingen forbindelse', true); tegn(); });
+            }).catch(function () { tjekker = false; kode = ''; toast('Ingen forbindelse', true); tegn(); });
           }
         };
       });
