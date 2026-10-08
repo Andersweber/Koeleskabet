@@ -384,6 +384,10 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .kameraboks.rund{border-radius:50%}
 .kameraboks video,.kameraboks img{width:100%;height:100%;object-fit:cover;display:block}
 .kameraboks video{transform:scaleX(-1)}
+.kameraboks{position:relative}
+.kam-tael{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:140px;font-weight:800;color:#fff;background:rgba(0,0,0,.25);
+  text-shadow:0 4px 24px rgba(0,0,0,.6)}
 
 /* ---------- Numpad ---------- */
 .numpad{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:5px}
@@ -1064,7 +1068,7 @@ function kald(navn) {
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ fn: navn, args: args })
     }).then(function (r) { return r.json(); }).then(function (b) {
-      if (!b.ok) throw new Error(b.fejl || 'Ukendt fejl');
+      if (!b.ok) { var fe = new Error(b.fejl || 'Ukendt fejl'); fe.server = true; throw fe; }
       return b.data;
     });
   }
@@ -1493,6 +1497,7 @@ function tagBilledeMedKamera(rundBeskaering) {
     h += '<div class="kameraboks' + (rundBeskaering ? ' rund' : '') + '">' +
          '<video id="kam-video" autoplay playsinline muted></video>' +
          '<img id="kam-foto" alt="" style="display:none">' +
+         '<div id="kam-tael" class="kam-tael" style="display:none"></div>' +
          '</div>';
     h += '<div class="knapper" id="kam-knapper"></div>';
     h += '</div></div>';
@@ -1506,8 +1511,33 @@ function tagBilledeMedKamera(rundBeskaering) {
         '<button class="stor-knap graa" id="kam-annuller">Annullér</button>' +
         '<button class="stor-knap" id="kam-tag"' + (klar ? '' : ' disabled') +
         '>📸 Tag billede</button>';
-      $('kam-annuller').onclick = function () { faerdig(null); };
-      $('kam-tag').onclick = tagBillede;
+      $('kam-annuller').onclick = function () { stopNedtaelling(); faerdig(null); };
+      $('kam-tag').onclick = startNedtaelling;
+    }
+
+    // 3 sekunders nedtælling, så man kan nå at stille sig til rette
+    var taelTimer = null;
+    function stopNedtaelling() {
+      clearInterval(taelTimer);
+      taelTimer = null;
+      var t = $('kam-tael');
+      if (t) t.style.display = 'none';
+    }
+    function startNedtaelling() {
+      if (!video.videoWidth) { toast('Kameraet er ikke klar endnu', true); return; }
+      var tilbage = 3;
+      var t = $('kam-tael');
+      t.textContent = tilbage;
+      t.style.display = 'flex';
+      $('kam-hjaelp').textContent = 'Gør dig klar…';
+      $('kam-tag').disabled = true;
+      taelTimer = setInterval(function () {
+        tilbage--;
+        if (afsluttet) { stopNedtaelling(); return; }
+        if (tilbage > 0) { t.textContent = tilbage; return; }
+        stopNedtaelling();
+        tagBillede();
+      }, 1000);
     }
 
     function tagBillede() {
@@ -1525,7 +1555,7 @@ function tagBilledeMedKamera(rundBeskaering) {
       $('kam-igen').onclick = function () {
         foto.style.display = 'none';
         video.style.display = 'block';
-        $('kam-hjaelp').textContent = 'Stil dig i midten og tryk på knappen.';
+        $('kam-hjaelp').textContent = 'Stil dig i midten og tryk på knappen – der tælles ned fra 3.';
         visOptageknapper(true);
       };
       $('kam-brug').onclick = function () { faerdig(d); };
@@ -1544,7 +1574,7 @@ function tagBilledeMedKamera(rundBeskaering) {
       if (p && p.catch) p.catch(function () {});
       video.onloadedmetadata = function () {
         if (afsluttet) return;
-        $('kam-hjaelp').textContent = 'Stil dig i midten og tryk på knappen.';
+        $('kam-hjaelp').textContent = 'Stil dig i midten og tryk på knappen – der tælles ned fra 3.';
         var knap = $('kam-tag');
         if (knap) knap.disabled = false;
       };
@@ -1683,19 +1713,43 @@ function gemKoe() {
   try { localStorage.setItem(KOE_NOEGLE, JSON.stringify(S.koe)); } catch (e) {}
 }
 
+var afsenderNu = false;
+var sendtKoeb = {};      // ref -> koebIds for køb der er gemt på serveren
+var fortrudtUnderveis = {}; // ref -> true hvis der blev fortrudt mens det blev sendt
+
 function afsendKoe() {
-  if (!S.koe.length) return Promise.resolve();
+  if (afsenderNu || !S.koe.length) return Promise.resolve();
+  afsenderNu = true;
   var post = S.koe[0];
   return kald('registrerKoeb', post.personId, post.linjer, post.ref)
     .then(function (svar) {
-      S.koe.shift();
+      afsenderNu = false;
+      S.koe = S.koe.filter(function (k) { return k.ref !== post.ref; });
       gemKoe();
-      if (svar && svar.produkter) S.produkter = svar.produkter;
+      sendtKoeb[post.ref] = svar && svar.koebIds ? svar.koebIds : [];
+      if (fortrudtUnderveis[post.ref]) {
+        delete fortrudtUnderveis[post.ref];
+        if (sendtKoeb[post.ref].length) kald('fortrydKoeb', sendtKoeb[post.ref]).catch(function () {});
+      } else if (svar && svar.advarsler && svar.advarsler.length) {
+        toast(svar.advarsler[0]);
+      }
+      if (svar && svar.produkter && !S.koe.length) S.produkter = svar.produkter;
       if (svar && svar.tilstand !== undefined) S.tilstand = svar.tilstand;
       if (S.koe.length) return afsendKoe();
-      render();
+      if (S.skaerm === 'personer' && !$('overlaylag').innerHTML) render();
     })
-    .catch(function () { /* prøver igen ved næste interval */ });
+    .catch(function (e) {
+      afsenderNu = false;
+      // Serveren afviste købet (ikke bare manglende net): giv op efter fem forsøg
+      if (e && e.server) {
+        post.fejl = (post.fejl || 0) + 1;
+        if (post.fejl >= 5) {
+          S.koe = S.koe.filter(function (k) { return k.ref !== post.ref; });
+          toast('Et køb kunne ikke gemmes: ' + e.message, true);
+        }
+        gemKoe();
+      }
+    });
 }
 setInterval(function () { if (S.koe.length) afsendKoe(); }, 20000);
 
@@ -2021,35 +2075,23 @@ function gennemfoerKoeb() {
     return l.antal + '× ' + p.navn;
   }).join(', ') + (sum.pantAntal ? ' · pant ' + sum.pantAntal + ' stk.' : '');
 
+  // Optimistisk: kvittér med det samme, gem i baggrunden. Købet ligger i den
+  // lokale kø (som også bruges offline), så det ikke går tabt hvis fanen lukkes.
   var ref = uuid();
-  S.arbejder = true;
-  render();
-
-  kald('registrerKoeb', person.id, linjer, ref)
-    .then(function (svar) {
-      S.arbejder = false;
-      if (svar.produkter) S.produkter = svar.produkter;
-      if (svar.tilstand !== undefined) S.tilstand = svar.tilstand;
-      S.kurv = {}; S.kurvAaben = false;
-      var visKvit = function () {
-        visKvittering(person, svar.total || total, beskrivelse, svar.koebIds, svar.advarsler || []);
-      };
-      if (skalKoereVaeddeloeb(linjer)) koerVaeddeloeb(person, visKvit);
-      else visKvit();
-    })
-    .catch(function () {
-      // Ingen forbindelse: læg i kø, kvittér alligevel og træk lokalt fra lageret
-      S.arbejder = false;
-      S.koe.push({ ref: ref, personId: person.id, linjer: linjer, navn: person.navn,
-                   total: total, tid: Date.now() });
-      gemKoe();
-      linjer.forEach(function (l) {
-        var p = produktMed(l.produktId);
-        if (p) p.lager -= l.antal;
-      });
-      S.kurv = {}; S.kurvAaben = false;
-      visKvittering(person, total, beskrivelse, null, [], ref);
-    });
+  S.koe.push({ ref: ref, personId: person.id, linjer: linjer, navn: person.navn,
+               total: total, tid: Date.now() });
+  gemKoe();
+  linjer.forEach(function (l) {
+    var p = produktMed(l.produktId);
+    if (p) p.lager -= l.antal;
+  });
+  S.kurv = {}; S.kurvAaben = false;
+  afsendKoe();
+  var visKvit = function () {
+    visKvittering(person, total, beskrivelse, null, [], ref);
+  };
+  if (skalKoereVaeddeloeb(linjer)) koerVaeddeloeb(person, visKvit);
+  else visKvit();
 }
 
 function visKvittering(person, total, beskrivelse, koebIds, advarsler, koeRef) {
@@ -2059,7 +2101,7 @@ function visKvittering(person, total, beskrivelse, koebIds, advarsler, koeRef) {
   h += '<h2>Tak, ' + esc(person.navn.split(' ')[0]) + '!</h2>';
   h += '<div class="beloeb">' + esc(kr(total)) + '</div>';
   h += '<div class="varer">' + esc(beskrivelse) + '</div>';
-  if (koeRef) h += '<div class="advarsel">☁️ Gemmes så snart der er forbindelse</div>';
+  if (koeRef && !navigator.onLine) h += '<div class="advarsel">☁️ Gemmes så snart der er forbindelse</div>';
   (advarsler || []).forEach(function (a) {
     h += '<div class="advarsel">⚠️ ' + esc(a) + '</div>';
   });
@@ -2079,15 +2121,27 @@ function visKvittering(person, total, beskrivelse, koebIds, advarsler, koeRef) {
   $('fortrydknap').onclick = function () {
     clearInterval(kvitteringTimer);
     if (koeRef) {
-      S.koe = S.koe.filter(function (k) { return k.ref !== koeRef; });
-      gemKoe();
+      var iKoe = S.koe.some(function (k) { return k.ref === koeRef; });
+      if (sendtKoeb[koeRef]) {
+        // Allerede gemt: rul tilbage i baggrunden
+        kald('fortrydKoeb', sendtKoeb[koeRef]).then(function (svar) {
+          if (svar.produkter) S.produkter = svar.produkter;
+        }).catch(function () { toast('Kunne ikke fortryde købet', true); });
+      } else if (iKoe && afsenderNu && S.koe[0] && S.koe[0].ref === koeRef) {
+        // Sendes lige nu: fortryd så snart serveren har svaret
+        fortrudtUnderveis[koeRef] = true;
+      } else {
+        // Ikke sendt endnu: fjern fra køen og læg varerne tilbage lokalt
+        var post = S.koe.filter(function (k) { return k.ref === koeRef; })[0];
+        S.koe = S.koe.filter(function (k) { return k.ref !== koeRef; });
+        gemKoe();
+        if (post) post.linjer.forEach(function (l) {
+          var p = produktMed(l.produktId);
+          if (p) p.lager += l.antal;
+        });
+      }
       toast('Køb fortrudt');
-      kald('hentProdukter').then(function (svar) {
-        S.produkter = svar.produkter;
-        S.tilstand = svar.tilstand;
-        if (svar.spil) S.spil = svar.spil;
-        lukKvittering();
-      }).catch(function () { lukKvittering(); });
+      lukKvittering();
       return;
     }
     kald('fortrydKoeb', koebIds)
