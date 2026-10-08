@@ -4839,7 +4839,25 @@ function hentBillederFraServer() {
   ).catch(function () { /* cachen bruges videre */ });
 }
 
+/* Selvstændig udgave: tjek hvert 10. minut om siden er opdateret, og genindlæs
+ * når kiosken står på personlisten og intet ligger i offline-køen. */
+function holdOpdateret() {
+  if (!window.KOELESKAB_API || !window.fetch) return;
+  var hent = function () {
+    return fetch(location.pathname, { cache: 'no-store' }).then(function (r) { return r.text(); });
+  };
+  var foerste = null;
+  hent().then(function (t) { foerste = t; }).catch(function () {});
+  setInterval(function () {
+    if (foerste === null || S.skaerm !== 'personer' || (S.koe && S.koe.length)) return;
+    hent().then(function (t) {
+      if (t && t !== foerste && S.skaerm === 'personer') location.reload();
+    }).catch(function () {});
+  }, 600000);
+}
+
 function start() {
+  holdOpdateret();
   laesKoe();
   laesBilledCache();
   kald('hentStartdata')

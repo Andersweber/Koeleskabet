@@ -1,0 +1,19 @@
+name: Byg docs/index.html
+on:
+  push:
+    branches: [main]
+    paths: ['Index.html', 'Styles.html', 'JavaScript.html', 'build.py']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 build.py
+      - name: Commit hvis siden er ændret
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add docs/index.html
+          git diff --cached --quiet || (git commit -m "Byg docs/index.html" && git push)
