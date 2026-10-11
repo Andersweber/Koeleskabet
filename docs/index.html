@@ -385,6 +385,9 @@ input,select,textarea{user-select:text;-webkit-user-select:text}
 .kameraboks video,.kameraboks img{width:100%;height:100%;object-fit:cover;display:block}
 .kameraboks video{transform:scaleX(-1)}
 .kameraboks{position:relative}
+.kam-flash{position:fixed;inset:0;background:#fff;z-index:99999;pointer-events:none;
+  animation:kamflash .65s ease-out forwards}
+@keyframes kamflash{0%{opacity:1}35%{opacity:1}100%{opacity:0}}
 .kam-tael{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   font-size:140px;font-weight:800;color:#fff;background:rgba(0,0,0,.25);
   text-shadow:0 4px 24px rgba(0,0,0,.6)}
@@ -1540,10 +1543,19 @@ function tagBilledeMedKamera(rundBeskaering) {
       }, 1000);
     }
 
+    // Hele skærmen blinker hvid, som et kameraflash
+    function flash() {
+      var f = document.createElement('div');
+      f.className = 'kam-flash';
+      document.body.appendChild(f);
+      setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 700);
+    }
+
     function tagBillede() {
       if (!video.videoWidth) { toast('Kameraet er ikke klar endnu', true); return; }
       var d = komprimerKilde(video, video.videoWidth, video.videoHeight, true);
       if (!d) { toast('Billedet kunne ikke komprimeres – prøv igen', true); return; }
+      flash();
 
       video.style.display = 'none';
       foto.src = d;

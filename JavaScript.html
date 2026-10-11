@@ -540,10 +540,19 @@ function tagBilledeMedKamera(rundBeskaering) {
       }, 1000);
     }
 
+    // Hele skærmen blinker hvid, som et kameraflash
+    function flash() {
+      var f = document.createElement('div');
+      f.className = 'kam-flash';
+      document.body.appendChild(f);
+      setTimeout(function () { if (f.parentNode) f.parentNode.removeChild(f); }, 700);
+    }
+
     function tagBillede() {
       if (!video.videoWidth) { toast('Kameraet er ikke klar endnu', true); return; }
       var d = komprimerKilde(video, video.videoWidth, video.videoHeight, true);
       if (!d) { toast('Billedet kunne ikke komprimeres – prøv igen', true); return; }
+      flash();
 
       video.style.display = 'none';
       foto.src = d;
